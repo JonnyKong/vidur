@@ -49,9 +49,12 @@ class ReplicaScheduleEvent(BaseEvent):
         for batch in self._batches:
             batch.on_schedule(self.time)
 
+        # Profiled on A40 node
+        cpu_overhead_us = max(118.1656 * self.running_queue_len - 80.8321, 0)
+
         return [
             BatchStageArrivalEvent(
-                self.time,
+                self.time + cpu_overhead_us / 1e6,
                 self._replica_id,
                 0,  # stage_id
                 batch,
