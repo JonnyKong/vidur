@@ -184,3 +184,13 @@ class SarathiReplicaScheduler(BaseReplicaScheduler):
             return
 
         return Batch(self._replica_id, requests, num_tokens)
+    
+    @property
+    def num_running_requests(self):
+        """
+        Preemption queue here is equivalent to the concatenation of preemption
+        queue and running queue in vLLM. Running requests are the ones that has
+        finished prefill.
+        """
+        return len([r for r in self._preempted_requests
+                    if r.is_prefill_complete])

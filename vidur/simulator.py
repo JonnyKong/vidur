@@ -62,23 +62,28 @@ class Simulator:
         )
 
         while self._event_queue and not self._terminate:
-            _, event = heapq.heappop(self._event_queue)
-            self._set_time(event._time)
-            new_events = event.handle_event(self._scheduler, self._metric_store)
-            self._add_events(new_events)
-
-            if self._config.metrics_config.write_json_trace:
-                self._event_trace.append(event.to_dict())
-
-            if self._config.metrics_config.enable_chrome_trace:
-                chrome_trace = event.to_chrome_trace()
-                if chrome_trace:
-                    self._event_chrome_trace.append(chrome_trace)
+            self.step()
 
         assert self._scheduler.is_empty() or self._terminate
 
         logger.info(f"Simulation ended at: {self._time}s")
 
+    def step(self) -> None:
+        _, event = heapq.heappop(self._event_queue)
+        self._set_time(event._time)
+        new_events = event.handle_event(self._scheduler, self._metric_store)
+        self._add_events(new_events)
+
+        if self._config.metrics_config.write_json_trace:
+            self._event_trace.append(event.to_dict())
+
+        if self._config.metrics_config.enable_chrome_trace:
+            chrome_trace = event.to_chrome_trace()
+            if chrome_trace:
+                self._event_chrome_trace.append(chrome_trace)
+
+    def get_time(self) -> float:
+        return self._time
     def _write_output(self) -> None:
         logger.info("Writing output")
 

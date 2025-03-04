@@ -22,5 +22,5 @@ python -m vidur.main \
     --sarathi_scheduler_config_batch_size_cap 8192 \
     --metrics_config_write_json_trace \
     --random_forrest_execution_time_predictor_config_prediction_max_prefill_chunk_size 16384 \
-    --random_forrest_execution_time_predictor_config_prediction_max_batch_size 512 \
+    --random_forrest_execution_time_predictor_config_prediction_max_batch_size 2048 \
     --random_forrest_execution_time_predictor_config_prediction_max_tokens_per_request 16384
