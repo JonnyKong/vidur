@@ -19,6 +19,8 @@ dependencies:
   - ray-all
   - streamlit
   - randomname
+  - pandas
+  - ipython
   - pip:
     - kaleido
     - ddsketch
