@@ -30,7 +30,7 @@ class BaseEvent(ABC):
 
     @property
     def event_type(self):
-        pass
+        return str(self._event_type)
 
     @abstractmethod
     def handle_event(

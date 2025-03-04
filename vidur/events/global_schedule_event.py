@@ -21,11 +21,11 @@ class GlobalScheduleEvent(BaseEvent):
     ) -> List[BaseEvent]:
         from vidur.events.replica_schedule_event import ReplicaScheduleEvent
 
-        self._replica_set = set()
+        self._replica_set = []
         self._request_mapping = scheduler.schedule()
 
         for replica_id, request in self._request_mapping:
-            self._replica_set.add(replica_id)
+            self._replica_set.append(replica_id)
             scheduler.get_replica_scheduler(replica_id).add_request(request)
 
         return [
