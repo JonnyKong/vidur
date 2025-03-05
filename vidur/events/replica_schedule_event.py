@@ -17,11 +17,6 @@ class ReplicaScheduleEvent(BaseEvent):
 
         self._batches = []
 
-        # Metrics for logging
-        self.memory_usage_percent: float = 0.0
-        self.request_queue_len: int = 0
-        self.running_queue_len: int = 0
-
     def handle_event(
         self, scheduler: BaseGlobalScheduler, metrics_store: MetricsStore
     ) -> List[BaseEvent]:
@@ -29,28 +24,27 @@ class ReplicaScheduleEvent(BaseEvent):
 
         replica_scheduler = scheduler.get_replica_scheduler(self._replica_id)
 
-        # Get things to log before the scheduler actually runs, otherwise we
+        # Get states before the scheduler actually runs, otherwise we
         # are undercounting because the batch is already removed from the
         # scheduler queues
-        self.request_queue_len = replica_scheduler.num_pending_requests
-        if hasattr(replica_scheduler, 'num_running_requests'):
-            self.running_queue_len = replica_scheduler.num_running_requests
+        self.scheduler_states = replica_scheduler.get_states()
 
         self._batches = replica_scheduler.on_schedule()
 
         if not self._batches:
             return []
 
-        self.memory_usage_percent = replica_scheduler.memory_usage_percent
+        memory_usage_percent = replica_scheduler.memory_usage_percent
         metrics_store.on_replica_schedule(
-            self.time, self._replica_id, self.memory_usage_percent
+            self.time, self._replica_id, memory_usage_percent
         )
 
         for batch in self._batches:
             batch.on_schedule(self.time)
 
         # Profiled on A40 node
-        cpu_overhead_us = max(118.1656 * self.running_queue_len - 80.8321, 0)
+        num_running_requests = self.scheduler_states['num_running_requests']
+        cpu_overhead_us = max(118.1656 * num_running_requests - 80.8321, 0)
 
         return [
             BatchStageArrivalEvent(
@@ -76,9 +70,7 @@ class ReplicaScheduleEvent(BaseEvent):
                 "event_type": self.event_type,
                 "replica_id": self._replica_id,
                 "batch_ids": [batch.id for batch in self._batches],
-                "memory_usage_percent": self.memory_usage_percent,
-                "request_queue_len": self.request_queue_len,
-                "running_queue_len": self.running_queue_len,
+                **self.scheduler_states,
             }
 
     def to_chrome_trace(self) -> dict:
@@ -91,9 +83,5 @@ class ReplicaScheduleEvent(BaseEvent):
                 "ts": self.time * 1e6,
                 "pid": 0,
                 "tid": 0,
-                "args": {
-                    "memory_usage_percent": self.memory_usage_percent,
-                    "request_queue_len": self.request_queue_len,
-                    "running_queue_len": self.running_queue_len,
-                },
+                "args": self.scheduler_states,
             }

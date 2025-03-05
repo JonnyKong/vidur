@@ -1,9 +1,12 @@
 import json
 import os
 from abc import ABC
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from datetime import datetime
-from typing import List, Optional
+from pathlib import Path
+from typing import List
+from typing import Optional
 
 from vidur.config.base_poly_config import BasePolyConfig
 from vidur.config.device_sku_config import BaseDeviceSKUConfig
@@ -12,14 +15,12 @@ from vidur.config.model_config import BaseModelConfig
 from vidur.config.node_sku_config import BaseNodeSKUConfig
 from vidur.config.utils import dataclass_to_dict
 from vidur.logger import init_logger
-from vidur.types import (
-    ExecutionTimePredictorType,
-    GlobalSchedulerType,
-    ReplicaSchedulerType,
-    RequestGeneratorType,
-    RequestIntervalGeneratorType,
-    RequestLengthGeneratorType,
-)
+from vidur.types import ExecutionTimePredictorType
+from vidur.types import GlobalSchedulerType
+from vidur.types import ReplicaSchedulerType
+from vidur.types import RequestGeneratorType
+from vidur.types import RequestIntervalGeneratorType
+from vidur.types import RequestLengthGeneratorType
 
 logger = init_logger(__name__)
 
@@ -331,6 +332,8 @@ class SarathiSchedulerConfig(BaseReplicaSchedulerConfig):
 @dataclass
 class MetricsConfig:
     """Metric configuration."""
+    current_file_path = Path(__file__)
+    project_root_path = current_file_path.parent.parent.parent
 
     write_metrics: bool = field(
         default=True,
@@ -413,7 +416,7 @@ class MetricsConfig:
         metadata={"help": "Output directory."},
     )
     cache_dir: str = field(
-        default="cache",
+        default=str(project_root_path / "cache"),
         metadata={"help": "Cache directory."},
     )
 
@@ -492,24 +495,28 @@ class LORGlobalSchedulerConfig(BaseGlobalSchedulerConfig):
 
 @dataclass
 class BaseExecutionTimePredictorConfig(BasePolyConfig):
+    current_file_path = Path(__file__)
+    project_root_path = current_file_path.parent.parent.parent
+
     compute_input_file: str = field(
-        default="./data/profiling/compute/{DEVICE}/{MODEL}/mlp.csv",
+        default=str(project_root_path) + "/data/profiling/compute/{DEVICE}/{MODEL}/mlp.csv",
         metadata={"help": "Path to the compute input file."},
     )
     attention_input_file: str = field(
-        default="./data/profiling/compute/{DEVICE}/{MODEL}/attention.csv",
+        default=str(project_root_path) + "/data/profiling/compute/{DEVICE}/{MODEL}/attention.csv",
         metadata={"help": "Path to the attention input file."},
     )
     all_reduce_input_file: str = field(
-        default="./data/profiling/network/{NETWORK_DEVICE}/all_reduce.csv",
+        default=str(project_root_path) + "/data/profiling/network/{NETWORK_DEVICE}/all_reduce.csv",
         metadata={"help": "Path to the all reduce input file."},
     )
     send_recv_input_file: str = field(
-        default="./data/profiling/network/{NETWORK_DEVICE}/send_recv.csv",
+        default=str(project_root_path) + "/data/profiling/network/{NETWORK_DEVICE}/send_recv.csv",
         metadata={"help": "Path to the send recv input file."},
     )
     cpu_overhead_input_file: str = field(
-        default="./data/profiling/cpu_overhead/{NETWORK_DEVICE}/{MODEL}/cpu_overheads.csv",
+        default=str(project_root_path) +
+        "/data/profiling/cpu_overhead/{NETWORK_DEVICE}/{MODEL}/cpu_overheads.csv",
         metadata={"help": "Path to the cpu overhead input file."},
     )
     k_fold_cv_splits: int = field(
@@ -656,6 +663,13 @@ class SimulationConfig(ABC):
 
     def __post_init__(self):
         self.write_config_to_file()
+
+    @classmethod
+    def create_from_args_str(cls, args_str: str):
+        flat_config = create_flat_dataclass(cls).create_from_args_str(args_str)
+        instance = flat_config.reconstruct_original_dataclass()
+        instance.__flat_config__ = flat_config
+        return instance
 
     @classmethod
     def create_from_cli_args(cls):

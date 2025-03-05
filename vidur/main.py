@@ -9,6 +9,7 @@ def main() -> None:
     set_seeds(config.seed)
 
     simulator = Simulator(config)
+    simulator.set_freq(1740)
     simulator.run()
 
 

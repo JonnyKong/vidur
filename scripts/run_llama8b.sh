@@ -14,7 +14,7 @@ python -m vidur.main \
     --trace_request_length_generator_config_max_tokens 16384 \
     --trace_request_length_generator_config_trace_file ./data/processed_traces/sharegpt_v3_filtered.csv \
     --interval_generator_config_type gamma \
-    --gamma_request_interval_generator_config_qps 7 \
+    --gamma_request_interval_generator_config_qps 10 \
     --gamma_request_interval_generator_config_cv 1.414 \
     --replica_scheduler_config_type sarathi \
     --sarathi_scheduler_config_batch_size_cap 2048 \

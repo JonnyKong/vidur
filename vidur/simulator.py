@@ -84,6 +84,10 @@ class Simulator:
 
     def get_time(self) -> float:
         return self._time
+
+    def set_freq(self, freq: int) -> None:
+        self._scheduler.set_freq(freq)
+
     def _write_output(self) -> None:
         logger.info("Writing output")
 

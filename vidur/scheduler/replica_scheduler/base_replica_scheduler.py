@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 
 from vidur.config import (
     BaseReplicaSchedulerConfig,
@@ -63,6 +63,8 @@ class BaseReplicaScheduler(ABC):
             )
             for stage_id in range(num_stages)
         }
+
+        self.execution_time_predictor = execution_time_predictor
 
     @property
     def num_pending_requests(self) -> int:
@@ -143,3 +145,16 @@ class BaseReplicaScheduler(ABC):
             scheduled_batches.append(batch)
             self._num_running_batches += 1
         return scheduled_batches
+
+    def set_freq(self, freq: int):
+        self.execution_time_predictor.set_freq(freq)
+
+    def get_states(self) -> dict:
+        ret = {
+            'request_queue_len': self.num_pending_requests,
+            'memory_usage_percent': self.memory_usage_percent,
+            'freq': self.execution_time_predictor.freq,
+        } 
+        if hasattr(self, 'num_running_requests'):
+            ret['num_running_requests'] = self.num_running_requests
+        return ret

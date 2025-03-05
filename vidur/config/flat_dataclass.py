@@ -6,7 +6,7 @@ from argparse import (
 )
 from collections import defaultdict, deque
 from dataclasses import MISSING, fields, make_dataclass
-from typing import Any, get_args
+from typing import Any, Optional, get_args
 
 from vidur.config.base_poly_config import BasePolyConfig
 from vidur.config.utils import (
@@ -85,7 +85,7 @@ def reconstruct_original_dataclass(self) -> Any:
 
 
 @classmethod
-def create_from_cli_args(cls) -> Any:
+def create_from_args_str(cls, args_str: Optional[str] = None) -> Any:
     """
     This function is dynamically mapped to FlatClass as a class method.
     """
@@ -131,9 +131,17 @@ def create_from_cli_args(cls) -> Any:
             arg_params["nargs"] = nargs
         parser.add_argument(f"--{field.name}", **arg_params)
 
-    args = parser.parse_args()
+    if args_str:
+        args = parser.parse_args(args_str.split())
+    else:
+        args = parser.parse_args()
 
     return cls(**vars(args))
+
+
+@classmethod
+def create_from_cli_args(cls) -> Any:
+    return cls.create_from_args_str()
 
 
 def create_flat_dataclass(input_dataclass: Any) -> Any:
@@ -226,5 +234,6 @@ def create_flat_dataclass(input_dataclass: Any) -> Any:
     # Helper methods
     FlatClass.reconstruct_original_dataclass = reconstruct_original_dataclass
     FlatClass.create_from_cli_args = create_from_cli_args
+    FlatClass.create_from_args_str = create_from_args_str
 
     return FlatClass

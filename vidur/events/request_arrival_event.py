@@ -34,11 +34,4 @@ class RequestArrivalEvent(BaseEvent):
         }
 
     def to_chrome_trace(self) -> dict:
-        return {
-            "name": f"req_arr {self._request._id}",
-            "ph": "i",
-            "ts": self.time,
-            "s": "g",
-            "pid": 0,
-            "tid": 0,
-        }
+        return None

@@ -60,3 +60,7 @@ class BaseGlobalScheduler(ABC):
     @abstractmethod
     def schedule(self) -> List[Tuple[int, Request]]:
         pass
+
+    def set_freq(self, freq: int):
+        for s in self._replica_schedulers.values():
+            s.set_freq(freq)
