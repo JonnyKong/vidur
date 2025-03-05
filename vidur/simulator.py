@@ -1,15 +1,18 @@
-import atexit
 import heapq
 import json
 from typing import List
+from typing import Optional
 
 from vidur.config import SimulationConfig
 from vidur.entities import Cluster
-from vidur.events import BaseEvent, RequestArrivalEvent
+from vidur.events import BaseEvent
+from vidur.events import RequestArrivalEvent
+from vidur.events.replica_schedule_event import ReplicaScheduleEvent
 from vidur.logger import init_logger
 from vidur.metrics import MetricsStore
 from vidur.request_generator import RequestGeneratorRegistry
-from vidur.scheduler import BaseGlobalScheduler, GlobalSchedulerRegistry
+from vidur.scheduler import BaseGlobalScheduler
+from vidur.scheduler import GlobalSchedulerRegistry
 
 logger = init_logger(__name__)
 
@@ -46,7 +49,6 @@ class Simulator:
         )
 
         self._init_event_queue()
-        atexit.register(self._write_output)
 
     @property
     def scheduler(self) -> BaseGlobalScheduler:
@@ -62,13 +64,14 @@ class Simulator:
         )
 
         while self._event_queue and not self._terminate:
-            self.step()
+            _ = self.step()
 
         assert self._scheduler.is_empty() or self._terminate
 
         logger.info(f"Simulation ended at: {self._time}s")
+        self._write_output()
 
-    def step(self) -> None:
+    def step(self) -> Optional[dict]:
         _, event = heapq.heappop(self._event_queue)
         self._set_time(event._time)
         new_events = event.handle_event(self._scheduler, self._metric_store)
@@ -81,6 +84,10 @@ class Simulator:
             chrome_trace = event.to_chrome_trace()
             if chrome_trace:
                 self._event_chrome_trace.append(chrome_trace)
+
+        # We make ReplicaScheduleEvent the unified place to return states, to
+        # be used for calculating the rewards
+        return event.to_dict() if isinstance(event, ReplicaScheduleEvent) else None
 
     def get_time(self) -> float:
         return self._time

@@ -153,7 +153,6 @@ class BaseExecutionTimePredictor(ABC):
         pass
 
     def set_freq(self, freq):
-        logger.info(f"BaseExecutionTimePredictor set_freq: {freq}")
         self.freq = freq
 
     @staticmethod

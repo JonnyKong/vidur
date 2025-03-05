@@ -43,8 +43,8 @@ class ReplicaScheduleEvent(BaseEvent):
             batch.on_schedule(self.time)
 
         # Profiled on A40 node
-        num_running_requests = self.scheduler_states['num_running_requests']
-        cpu_overhead_us = max(118.1656 * num_running_requests - 80.8321, 0)
+        running_queue_len = self.scheduler_states['running_queue_len']
+        cpu_overhead_us = max(118.1656 * running_queue_len - 80.8321, 0)
 
         return [
             BatchStageArrivalEvent(

@@ -15,6 +15,10 @@ class Cluster(BaseEntity):
         metrics_config: MetricsConfig,
         generator_config: BaseRequestGeneratorConfig,
     ) -> None:
+        # Reset replica id counter for each new cluster, since global scheduler
+        # assumes id of replicas start with 0
+        Replica._id = -1
+
         self._id = Cluster.generate_id()
         self._config = cluster_config
 

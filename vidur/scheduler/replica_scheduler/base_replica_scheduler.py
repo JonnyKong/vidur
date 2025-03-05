@@ -151,10 +151,10 @@ class BaseReplicaScheduler(ABC):
 
     def get_states(self) -> dict:
         ret = {
-            'request_queue_len': self.num_pending_requests,
+            'waiting_queue_len': self.num_pending_requests,
             'memory_usage_percent': self.memory_usage_percent,
             'freq': self.execution_time_predictor.freq,
         } 
         if hasattr(self, 'num_running_requests'):
-            ret['num_running_requests'] = self.num_running_requests
+            ret['running_queue_len'] = self.num_running_requests
         return ret

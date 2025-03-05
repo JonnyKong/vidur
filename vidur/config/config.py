@@ -411,7 +411,7 @@ class MetricsConfig:
         default=None,
         metadata={"help": "Maximum batch index."},
     )
-    output_dir: str = field(
+    output_dir_root: str = field(
         default="simulator_output",
         metadata={"help": "Output directory."},
     )
@@ -422,7 +422,7 @@ class MetricsConfig:
 
     def __post_init__(self):
         self.output_dir = (
-            f"{self.output_dir}/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S-%f')}"
+            f"{self.output_dir_root}/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S-%f')}"
         )
         os.makedirs(self.output_dir, exist_ok=True)
 

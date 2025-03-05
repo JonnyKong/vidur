@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List
 from typing import Optional
 
 import gymnasium as gym
@@ -47,64 +48,108 @@ class VidurSimulatorEnv(gym.Env):
             --sarathi_scheduler_config_batch_size_cap 8192 
             --random_forrest_execution_time_predictor_config_prediction_max_prefill_chunk_size 16384 
             --random_forrest_execution_time_predictor_config_prediction_max_batch_size 2048 
-            --random_forrest_execution_time_predictor_config_prediction_max_tokens_per_request 16384
+            --random_forrest_execution_time_predictor_config_prediction_max_tokens_per_request 16384 
+            --no-metrics_config_write_json_trace 
+            --no-metrics_config_save_table_to_wandb 
+            --no-metrics_config_store_plots 
+            --no-metrics_config_store_operation_metrics 
+            --no-metrics_config_store_token_completion_metrics 
+            --no-metrics_config_store_request_metrics 
+            --no-metrics_config_store_batch_metrics 
+            --no-metrics_config_store_utilization_metrics 
+            --no-metrics_config_keep_individual_batch_metrics 
         """
         self.step_size_seconds = step_size_seconds
 
-        self.observation_space = gym.spaces.Dict({
-            'memory_usage_percent': gym.spaces.Box(low=0.0, high=100.0, shape=(1,), dtype=np.float32),
-        })
+        self.observation_space = gym.spaces.Box(0, 100, shape=(1,))
 
         self.freq_choices = A40_FREQ_CHOICES
         self.action_space = gym.spaces.Discrete(len(self.freq_choices))
 
         self.config: SimulationConfig = SimulationConfig.create_from_args_str(args_str)
-        self.simulator = Simulator(self.config)
-        self.last_step_time: Optional[float] = None
-
-        # Use highest freq in the beginning
-        self.simulator.set_freq(max(self.freq_choices))
+        self.simulator: Optional[Simulator] = None
+        self.last_step_time: float = 0.0
 
     def _get_obs(self):
+        assert self.simulator
         global_scheduler = self.simulator.scheduler
-        replica_scheduler = global_scheduler.get_replica_scheduler(0)
+        replica_scheduler = next(iter(global_scheduler._replica_schedulers.values()))
         states = replica_scheduler.get_states()
-        return {
-            'memory_usage_percent': states['memory_usage_percent'],
-        }
+        return np.array([
+            states['memory_usage_percent'],
+        ], dtype=np.float32)
 
     def _get_info(self):
         return {}
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
+        if self.simulator:
+            self.simulator._write_output()
+
         super().reset(seed=seed)
+
+        # This will re-create logging dir with a new timestamp
+        self.config.metrics_config.__post_init__()
+
         self.simulator = Simulator(self.config)
-        self.last_step_time = None
+        # Use highest freq in the beginning
+        self.simulator.set_freq(max(self.freq_choices))
+
+        self.last_step_time = 0.0
+
+        observation = self._get_obs()
+        info = self._get_info()
+
+        return observation, info
 
     def step(self, action):
+        assert self.simulator
+
         terminated = False
 
         freq = self.freq_choices[action]
         self.simulator.set_freq(freq)
 
-        while (
-            self.last_step_time is None
-            or self.simulator.get_time() < self.last_step_time + self.step_size_seconds
-        ):
+        replica_scheduler_states = []
+        while self.simulator.get_time() < self.last_step_time + self.step_size_seconds:
             if not self.simulator._event_queue or self.simulator._terminate:
                 terminated = True
                 break
-            # TODO: terminate if overloads too much, and give a negative reward
-            self.simulator.step()
+            s = self.simulator.step()
+            if s:
+                replica_scheduler_states.append(s)
 
         self.last_step_time = self.simulator.get_time()
 
-        truncated = False
-        reward = 0.0
+        # terminate if overloads too much, and give a negative reward
         observation = self._get_obs()
-        info = self._get_info()
+        reward = self.calc_reward(replica_scheduler_states)
 
-        return observation, reward, terminated, truncated, info
+        if self.is_overloaded(replica_scheduler_states): 
+            print('Env terminated because waiting queue grows too long')
+            terminated = True
+            reward = -100.0
+
+        return observation, reward, terminated, False, self._get_info()
+
+    @staticmethod
+    def calc_reward(replica_scheduler_states: List[dict]) -> float:
+        if len(replica_scheduler_states) > 0:
+            mean_waiting_queue_size = np.mean([s['waiting_queue_len']
+                                               for s in replica_scheduler_states])
+            return float(1.0 - mean_waiting_queue_size / (mean_waiting_queue_size + 20))
+        else:
+            return 0.0
+
+    @staticmethod
+    def is_overloaded(replica_scheduler_states: List[dict]) -> bool:
+        if len(replica_scheduler_states) > 0:
+            mean_waiting_queue_size = np.mean([s['waiting_queue_len']
+                                               for s in replica_scheduler_states])
+            return float(mean_waiting_queue_size) >= 500
+        else:
+            return False
+        
 
 
 gym.register(
