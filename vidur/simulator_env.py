@@ -61,11 +61,14 @@ class VidurSimulatorEnv(gym.Env):
         """
         self.step_size_seconds = step_size_seconds
 
-        self.observation_space = gym.spaces.Box(0, 100, shape=(1,))
+        self.observation_space = gym.spaces.Box(0, 100, shape=(2,))
 
         self.freq_choices = A40_FREQ_CHOICES
         self.action_space = gym.spaces.Discrete(len(self.freq_choices))
 
+        self.episode_id = -1
+
+        # These will be initialized on every reset()
         self.config: SimulationConfig = SimulationConfig.create_from_args_str(args_str)
         self.simulator: Optional[Simulator] = None
         self.last_step_time: float = 0.0
@@ -77,6 +80,7 @@ class VidurSimulatorEnv(gym.Env):
         states = replica_scheduler.get_states()
         return np.array([
             states['memory_usage_percent'],
+            states['waiting_queue_len'],
         ], dtype=np.float32)
 
     def _get_info(self):
@@ -85,11 +89,18 @@ class VidurSimulatorEnv(gym.Env):
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         if self.simulator:
             self.simulator._write_output()
+            src_log_dir = Path(self.config.metrics_config.output_dir)
+            dst_log_dir = src_log_dir.parent / f'episode_{self.episode_id:06d}'
+            src_log_dir.rename(dst_log_dir)
 
         super().reset(seed=seed)
+        self.episode_id += 1
 
         # This will re-create logging dir with a new timestamp
         self.config.metrics_config.__post_init__()
+
+        # Log chrome traces regularly
+        self.config.metrics_config.enable_chrome_trace = (self.episode_id % 10 == 0)
 
         self.simulator = Simulator(self.config)
         # Use highest freq in the beginning
@@ -123,12 +134,12 @@ class VidurSimulatorEnv(gym.Env):
 
         # terminate if overloads too much, and give a negative reward
         observation = self._get_obs()
-        reward = self.calc_reward(replica_scheduler_states)
+        # reward = self.calc_reward(replica_scheduler_states)
+        reward = 0.5
 
-        if self.is_overloaded(replica_scheduler_states): 
+        if self.is_overloaded(replica_scheduler_states):
             print('Env terminated because waiting queue grows too long')
             terminated = True
-            reward = -100.0
 
         return observation, reward, terminated, False, self._get_info()
 
@@ -146,10 +157,9 @@ class VidurSimulatorEnv(gym.Env):
         if len(replica_scheduler_states) > 0:
             mean_waiting_queue_size = np.mean([s['waiting_queue_len']
                                                for s in replica_scheduler_states])
-            return float(mean_waiting_queue_size) >= 500
+            return float(mean_waiting_queue_size) >= 200
         else:
             return False
-        
 
 
 gym.register(
