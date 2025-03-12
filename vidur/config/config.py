@@ -568,7 +568,7 @@ class BaseExecutionTimePredictorConfig(BasePolyConfig):
         default=True,
         metadata={"help": "Whether to skip CPU overhead modeling."},
     )
-
+ 
 
 @dataclass
 class LinearRegressionExecutionTimePredictorConfig(BaseExecutionTimePredictorConfig):
@@ -688,6 +688,10 @@ class SimulationConfig(ABC):
     power_predictor_config: BasePowerPredictorConfig = field(
         default_factory=DummyPowerPredictorConfig,
         metadata={"help": "Power predictor config."},
+    )
+    latency_frequency_predictor_model_path: str = field(
+        default="",
+        metadata={"help": "Path to the frequency based latency predictor model."},
     )
 
     def __post_init__(self):

@@ -24,6 +24,7 @@ class ExecutionTime(BaseEntity):
         prepare_inputs_e2e_time: float,
         process_model_outputs_time: float,
         ray_comm_time: float,
+        freq_model_latency: float = None,
     ) -> None:
         self._id = ExecutionTime.generate_id()
 
@@ -55,6 +56,8 @@ class ExecutionTime(BaseEntity):
         self._prepare_inputs_e2e_time = prepare_inputs_e2e_time
         self._process_model_outputs_time = process_model_outputs_time
         self._ray_comm_time = ray_comm_time
+
+        self.latency_from_freq_model = freq_model_latency
 
     def _get_mlp_layer_execution_time(self) -> float:
         return (
@@ -179,6 +182,8 @@ class ExecutionTime(BaseEntity):
 
     @property
     def model_time(self) -> float:
+        if self.latency_from_freq_model:
+            return self.latency_from_freq_model
         # we are not counting the execution time for the embedding layer and last softmax layer
         block_execution_time = self._get_block_execution_time()
         pipeline_stage_execution_time = (
@@ -195,5 +200,7 @@ class ExecutionTime(BaseEntity):
 
     @property
     def total_time(self) -> float:
+        if self.latency_from_freq_model:
+            return 0
         # return in seconds
         return self.model_time + self._get_cpu_overhead() * 1e-3

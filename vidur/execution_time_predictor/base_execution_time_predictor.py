@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional
+import numpy as np
+import pickle
+from sklearn.ensemble import GradientBoostingRegressor
 
 from vidur.config import (
     BaseExecutionTimePredictorConfig,
@@ -35,6 +38,14 @@ class BaseExecutionTimePredictor(ABC):
 
         self.freq: Optional[int] = None
 
+        self.latency_frequency_predictor_model_path = None
+
+        self._latency_freq_model_prefill = None
+        self._latency_freq_model_decode = None
+        self._latency_freq_model_hybrid = None
+        
+
+
     def get_execution_time(self, batch: Batch, pipeline_stage: int) -> ExecutionTime:
         if pipeline_stage == self._replica_config.num_pipeline_stages - 1:
             pipeline_parallel_communication_time = 0
@@ -50,30 +61,82 @@ class BaseExecutionTimePredictor(ABC):
                 self._get_tensor_parallel_communication_time(batch)
             )
 
-        t = ExecutionTime(
-            self._num_layers_per_pipeline_stage,
-            self._get_attention_rope_execution_time(batch),
-            self._get_attention_kv_cache_save_execution_time(batch),
-            self._get_attention_decode_execution_time(batch),
-            self._get_attention_prefill_execution_time(batch),
-            self._get_attention_layer_pre_proj_execution_time(batch),
-            self._get_attention_layer_post_proj_execution_time(batch),
-            self._get_mlp_layer_up_proj_execution_time(batch),
-            self._get_mlp_layer_down_proj_execution_time(batch),
-            self._get_mlp_layer_act_execution_time(batch),
-            self._get_attn_norm_layer_act_execution_time(batch),
-            self._get_mlp_norm_layer_act_execution_time(batch),
-            self._get_add_layer_act_execution_time(batch),
-            tensor_parallel_communication_time,
-            pipeline_parallel_communication_time,
-            self._get_schedule_time(batch),
-            self._get_sampler_e2e_time(batch),
-            self._get_prepare_inputs_e2e_time(batch),
-            self._get_process_model_outputs_time(batch),
-            self._get_ray_comm_time(batch),
-        )
-        if self.freq is not None:
-            self.scale_execution_time_by_freq(t, self.freq)
+        latency_from_freq_model = 0
+        if self.latency_frequency_predictor_model_path is not None:
+            freq = self.freq
+            prefill_lens = batch.prefill_lens
+            decode_lens = batch.decode_lens
+
+            prefill_batch_size = len(prefill_lens)
+            prefill_len_sum = np.sum(prefill_lens) if prefill_batch_size > 0 else 0
+            prefill_len_std = np.std(prefill_lens) if prefill_batch_size > 0 else 0.0
+            prefill_len_max = np.max(prefill_lens) if prefill_batch_size > 0 else 0
+
+            decode_batch_size = len(decode_lens)
+            decode_len_sum = np.sum(decode_lens) if decode_batch_size > 0 else 0
+            decode_len_std = np.std(decode_lens) if decode_batch_size > 0 else 0.0
+            decode_len_max = np.max(decode_lens) if decode_batch_size > 0 else 0
+
+            if (prefill_batch_size > 0) and (decode_batch_size == 0):
+                model_input_prefill = np.array([freq, prefill_batch_size, prefill_len_sum, prefill_len_max, prefill_len_std]).reshape(1, -1)
+                latency_from_freq_model = self._latency_freq_model_prefill.predict(model_input_prefill)
+                
+            elif (prefill_batch_size == 0) and (decode_batch_size > 0):
+                model_input_decode = np.array([freq, decode_batch_size, decode_len_sum, decode_len_max, decode_len_std]).reshape(1, -1)
+                latency_from_freq_model = self._latency_freq_model_decode.predict(model_input_decode)
+            else:
+                model_input_hybrid = np.array([freq, decode_batch_size, prefill_batch_size, decode_len_sum, prefill_len_sum, decode_len_max, prefill_len_max, decode_len_std, prefill_len_std]).reshape(1, -1)
+                latency_from_freq_model = self._latency_freq_model_hybrid.predict(model_input_hybrid)
+            latency_from_freq_model = latency_from_freq_model.item()
+            t = ExecutionTime(
+                self._num_layers_per_pipeline_stage,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                tensor_parallel_communication_time,
+                pipeline_parallel_communication_time,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                latency_from_freq_model,
+            )
+        else:
+            t = ExecutionTime(
+                self._num_layers_per_pipeline_stage,
+                self._get_attention_rope_execution_time(batch),
+                self._get_attention_kv_cache_save_execution_time(batch),
+                self._get_attention_decode_execution_time(batch),
+                self._get_attention_prefill_execution_time(batch),
+                self._get_attention_layer_pre_proj_execution_time(batch),
+                self._get_attention_layer_post_proj_execution_time(batch),
+                self._get_mlp_layer_up_proj_execution_time(batch),
+                self._get_mlp_layer_down_proj_execution_time(batch),
+                self._get_mlp_layer_act_execution_time(batch),
+                self._get_attn_norm_layer_act_execution_time(batch),
+                self._get_mlp_norm_layer_act_execution_time(batch),
+                self._get_add_layer_act_execution_time(batch),
+                tensor_parallel_communication_time,
+                pipeline_parallel_communication_time,
+                self._get_schedule_time(batch),
+                self._get_sampler_e2e_time(batch),
+                self._get_prepare_inputs_e2e_time(batch),
+                self._get_process_model_outputs_time(batch),
+                self._get_ray_comm_time(batch),
+                latency_from_freq_model,
+            )
+            if self.freq is not None:
+                self.scale_execution_time_by_freq(t, self.freq)
         return t
 
     @abstractmethod
@@ -154,6 +217,23 @@ class BaseExecutionTimePredictor(ABC):
 
     def set_freq(self, freq):
         self.freq = freq
+
+    def set_latency_frequency_predictor_model_path(self, path: str):
+        self.latency_frequency_predictor_model_path = path
+        if self.latency_frequency_predictor_model_path:
+            try:
+                with open(self.latency_frequency_predictor_model_path + "/batch_latency_predictor_A40-LLama3-8B_prefill-only.pkl", 'rb') as f:
+                    self._latency_freq_model_prefill = pickle.load(f)
+                    print("Loaded prefill model")
+                with open(self.latency_frequency_predictor_model_path + "/batch_latency_predictor_A40-LLama3-8B_decode-only.pkl", 'rb') as f:
+                    self._latency_freq_model_decode = pickle.load(f)
+                    print("Loaded decode model")
+                with open(self.latency_frequency_predictor_model_path + "/batch_latency_predictor_A40-LLama3-8B_hybrid.pkl", 'rb') as f:
+                    self._latency_freq_model_hybrid = pickle.load(f)
+                    print("Loaded hybrid model")
+            except FileNotFoundError:
+                self._config.latency_frequency_predictor_enabled = None
+                logger.error(f"Latency frequency model not found at {self.latency_frequency_predictor_model_path}")
 
     @staticmethod
     def scale_execution_time_by_freq(t: ExecutionTime, freq: int) -> None:

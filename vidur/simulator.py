@@ -95,6 +95,9 @@ class Simulator:
     def set_freq(self, freq: int) -> None:
         self._scheduler.set_freq(freq)
 
+    def set_latency_frequency_predictor_model_path(self, path: str) -> None:
+        self._scheduler.set_latency_frequency_predictor_model_path(path)
+
     def _write_output(self) -> None:
         logger.info("Writing output")
 

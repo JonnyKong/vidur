@@ -185,6 +185,9 @@ class BaseReplicaScheduler(ABC):
         self.freq = freq
         self.execution_time_predictor.set_freq(freq)
 
+    def set_latency_frequency_predictor_model_path(self, path: str):
+        self.execution_time_predictor.set_latency_frequency_predictor_model_path(path)
+
     def get_states(self, time: float) -> dict:
         # This calculation assumes this function is called at the next
         # scheduling step, before `on_schedule()` is called

@@ -71,3 +71,7 @@ class BaseGlobalScheduler(ABC):
     def set_freq(self, freq: int):
         for s in self._replica_schedulers.values():
             s.set_freq(freq)
+
+    def set_latency_frequency_predictor_model_path(self, path: str):
+        for s in self._replica_schedulers.values():
+            s.set_latency_frequency_predictor_model_path(path)
