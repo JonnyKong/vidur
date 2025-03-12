@@ -8,19 +8,7 @@ import numpy as np
 from vidur.config import SimulationConfig
 from vidur.simulator import Simulator
 
-A40_FREQ_CHOICES = [
-    540,
-    660,
-    780,
-    900,
-    1020,
-    1140,
-    1260,
-    1380,
-    1500,
-    1620,
-    1740,
-]
+A40_FREQ_CHOICES = [210, 360, 510, 675, 825, 975, 1125, 1275, 1440, 1590, 1740]
 
 
 class VidurSimulatorEnv(gym.Env):
