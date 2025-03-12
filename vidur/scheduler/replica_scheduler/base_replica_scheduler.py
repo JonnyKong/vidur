@@ -11,6 +11,7 @@ from vidur.execution_time_predictor import BaseExecutionTimePredictor
 from vidur.logger import init_logger
 from vidur.scheduler.replica_stage_scheduler import ReplicaStageScheduler
 from vidur.scheduler.utils.memory_planner import MemoryPlanner
+from vidur.power_predictor import BasePowerPredictor
 
 logger = init_logger(__name__)
 
@@ -24,6 +25,7 @@ class BaseReplicaScheduler(ABC):
         replica: Replica,
         num_stages: int,
         execution_time_predictor: BaseExecutionTimePredictor,
+        power_predictor: BasePowerPredictor,
     ) -> None:
         self._config = replica_scheduler_config
         self._replica_config = replica_config
@@ -65,6 +67,8 @@ class BaseReplicaScheduler(ABC):
         }
 
         self.execution_time_predictor = execution_time_predictor
+        self.power_predictor = power_predictor
+        self.freq: Optional[int] = None
 
     @property
     def num_pending_requests(self) -> int:
@@ -146,7 +150,16 @@ class BaseReplicaScheduler(ABC):
             self._num_running_batches += 1
         return scheduled_batches
 
+    def predict_power(self, batches: List[Batch]):
+        if not self.freq:
+            print('WARNING: freq is unset, returning predicted power as 0')
+            return 0.0
+        else:
+            return [self.power_predictor.predict(b, self.freq)
+                    for b in batches]
+
     def set_freq(self, freq: int):
+        self.freq = freq
         self.execution_time_predictor.set_freq(freq)
 
     def get_states(self) -> dict:

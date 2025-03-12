@@ -22,4 +22,6 @@ python -m vidur.main \
     --sarathi_scheduler_config_batch_size_cap 8192 \
     --random_forrest_execution_time_predictor_config_prediction_max_prefill_chunk_size 16384 \
     --random_forrest_execution_time_predictor_config_prediction_max_batch_size 2048 \
-    --random_forrest_execution_time_predictor_config_prediction_max_tokens_per_request 16384
+    --random_forrest_execution_time_predictor_config_prediction_max_tokens_per_request 16384 \
+    --power_predictor_config_type gdbt \
+    --gdbt_power_predictor_config_model_input_file /export2/kong102/energy_efficient_serving_results/power_model/A40_llama3-8B.pkl

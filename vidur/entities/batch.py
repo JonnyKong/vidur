@@ -136,6 +136,16 @@ class Batch(BaseEntity):
     def completed_requests(self) -> List[Request]:
         return [request for request in self._requests if request.completed]
 
+    @property
+    def prefill_lens(self) -> List[int]:
+        return [t for r, t in zip(self.requests, self._num_tokens)
+                if not r.is_prefill_complete]
+
+    @property
+    def decode_lens(self) -> List[int]:
+        return [t for r, t in zip(self.requests, self._num_tokens)
+                if r.is_prefill_complete]
+
     def to_dict(self) -> dict:
         return {
             "id": self._id,

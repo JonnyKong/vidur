@@ -21,6 +21,7 @@ from vidur.types import ReplicaSchedulerType
 from vidur.types import RequestGeneratorType
 from vidur.types import RequestIntervalGeneratorType
 from vidur.types import RequestLengthGeneratorType
+from vidur.types import PowerPredictorType
 
 logger = init_logger(__name__)
 
@@ -614,6 +615,30 @@ class RandomForrestExecutionTimePredictorConfig(BaseExecutionTimePredictorConfig
 
 
 @dataclass
+class BasePowerPredictorConfig(BasePolyConfig):
+    current_file_path = Path(__file__)
+    project_root_path = current_file_path.parent.parent.parent
+
+
+@dataclass
+class DummyPowerPredictorConfig(BasePowerPredictorConfig):
+    @staticmethod
+    def get_type():
+        return PowerPredictorType.DUMMY
+
+
+@dataclass
+class GdbtPowerPredictorConfig(BasePowerPredictorConfig):
+    model_input_file: str = field(
+        metadata={"help": "Path to the power predictor file."},
+    )
+
+    @staticmethod
+    def get_type():
+        return PowerPredictorType.GDBT
+
+
+@dataclass
 class ClusterConfig:
     num_replicas: int = field(
         default=1,
@@ -659,6 +684,10 @@ class SimulationConfig(ABC):
     metrics_config: MetricsConfig = field(
         default_factory=MetricsConfig,
         metadata={"help": "Metrics config."},
+    )
+    power_predictor_config: BasePowerPredictorConfig = field(
+        default_factory=DummyPowerPredictorConfig,
+        metadata={"help": "Power predictor config."},
     )
 
     def __post_init__(self):

@@ -34,6 +34,9 @@ class ReplicaScheduleEvent(BaseEvent):
         if not self._batches:
             return []
 
+        _powers = replica_scheduler.predict_power(self._batches)
+        print('Predicted power: ', _powers)
+
         memory_usage_percent = replica_scheduler.memory_usage_percent
         metrics_store.on_replica_schedule(
             self.time, self._replica_id, memory_usage_percent
