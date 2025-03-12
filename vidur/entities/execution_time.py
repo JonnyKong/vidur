@@ -201,6 +201,6 @@ class ExecutionTime(BaseEntity):
     @property
     def total_time(self) -> float:
         if self.latency_from_freq_model:
-            return 0
+            return self.latency_from_freq_model
         # return in seconds
         return self.model_time + self._get_cpu_overhead() * 1e-3
