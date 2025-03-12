@@ -18,7 +18,6 @@ class ReplicaScheduleEvent(BaseEvent):
 
         self._batches = []
         self.scheduler_states: Dict = {}
-        self.last_batch_power: float = 0.0
 
     def handle_event(
         self, scheduler: BaseGlobalScheduler, metrics_store: MetricsStore
@@ -27,17 +26,16 @@ class ReplicaScheduleEvent(BaseEvent):
 
         replica_scheduler = scheduler.get_replica_scheduler(self._replica_id)
 
-        # Get states before the scheduler actually runs, otherwise we
+        # Record states before the scheduler actually runs, since otherwise we
         # are undercounting because the batch is already removed from the
-        # scheduler queues
-        self.scheduler_states = replica_scheduler.get_states()
+        # scheduler queues. Also it's because states should correspond to the
+        # last finished batch, not the newly scheduled, in-execution batch
+        self.scheduler_states = replica_scheduler.get_states(self.time)
 
-        self._batches = replica_scheduler.on_schedule()
+        self._batches = replica_scheduler.on_schedule(self.time)
 
         if not self._batches:
             return []
-
-        self.last_batch_power = replica_scheduler.latest_finished_batch_power
 
         memory_usage_percent = replica_scheduler.memory_usage_percent
         metrics_store.on_replica_schedule(
@@ -47,13 +45,9 @@ class ReplicaScheduleEvent(BaseEvent):
         for batch in self._batches:
             batch.on_schedule(self.time)
 
-        # Profiled on A40 node
-        running_queue_len = self.scheduler_states['running_queue_len']
-        cpu_overhead_us = max(118.1656 * running_queue_len - 80.8321, 0)
-
         return [
             BatchStageArrivalEvent(
-                self.time + cpu_overhead_us / 1e6,
+                self.time + replica_scheduler._last_batch_idle_duration,
                 self._replica_id,
                 0,  # stage_id
                 batch,
@@ -75,7 +69,6 @@ class ReplicaScheduleEvent(BaseEvent):
                 "event_type": self.event_type,
                 "replica_id": self._replica_id,
                 "batch_ids": [batch.id for batch in self._batches],
-                "last_batch_power": self.last_batch_power,
                 **self.scheduler_states,
             }
 
@@ -84,13 +77,12 @@ class ReplicaScheduleEvent(BaseEvent):
             return None
         else:
             return {
-                "name": "Sys metrics",
+                "name": "",
                 "ph": "C",
                 "ts": self.time * 1e6,
                 "pid": 0,
                 "tid": 0,
                 "args": {
-                    "last_batch_power": self.last_batch_power,
                     **self.scheduler_states,
                 },
             }

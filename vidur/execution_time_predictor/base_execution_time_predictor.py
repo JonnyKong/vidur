@@ -158,16 +158,16 @@ class BaseExecutionTimePredictor(ABC):
     @staticmethod
     def scale_execution_time_by_freq(t: ExecutionTime, freq: int) -> None:
         factor = {
-            540: 5.0,
-            660: 3.5,
-            780: 2.5,
-            900: 2.0,
-            1020: 1.50,
-            1140: 1.30,
-            1260: 1.15,
-            1380: 1.08,
-            1500: 1.05,
-            1620: 1.02,
+            210: 5.0,
+            360: 3.5,
+            510: 2.5,
+            675: 2.0,
+            825: 1.50,
+            975: 1.30,
+            1125: 1.15,
+            1275: 1.08,
+            1440: 1.05,
+            1590: 1.02,
             1740: 1.00,
         }[freq]
         BaseExecutionTimePredictor.scale_execution_time_by_factor(t, factor)

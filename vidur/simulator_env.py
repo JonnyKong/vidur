@@ -46,10 +46,12 @@ class VidurSimulatorEnv(gym.Env):
             --no-metrics_config_store_batch_metrics 
             --no-metrics_config_store_utilization_metrics 
             --no-metrics_config_keep_individual_batch_metrics 
+            --power_predictor_config_type gdbt 
+            --gdbt_power_predictor_config_model_input_file /export2/kong102/energy_efficient_serving_results/power_model/A40_llama3-8B.pkl 
         """
         self.step_size_seconds = step_size_seconds
 
-        self.observation_space = gym.spaces.Box(0, 100, shape=(2,))
+        self.observation_space = gym.spaces.Box(0, 100, shape=(3,))
 
         self.freq_choices = A40_FREQ_CHOICES
         self.action_space = gym.spaces.Discrete(len(self.freq_choices))
@@ -61,14 +63,22 @@ class VidurSimulatorEnv(gym.Env):
         self.simulator: Optional[Simulator] = None
         self.last_step_time: float = 0.0
 
-    def _get_obs(self):
-        assert self.simulator
-        global_scheduler = self.simulator.scheduler
-        replica_scheduler = next(iter(global_scheduler._replica_schedulers.values()))
-        states = replica_scheduler.get_states()
+    @staticmethod
+    def _get_obs(replica_scheduler_states: List[dict]):
+        if len(replica_scheduler_states) == 0:
+            return np.array([0.0, 0.0, 300.0])
+
+        total_energy = np.sum([s['last_batch_power'] * s['last_batch_duration']
+                            for s in replica_scheduler_states])
+        total_duration = np.sum([s['last_batch_duration'] + s['last_batch_idle_duration']
+                                for s in replica_scheduler_states])
+        avg_power = total_energy / total_duration
+
+        latest_state = replica_scheduler_states[-1]
         return np.array([
-            states['memory_usage_percent'],
-            states['waiting_queue_len'],
+            latest_state['memory_usage_percent'],
+            latest_state['waiting_queue_len'],
+            avg_power,
         ], dtype=np.float32)
 
     def _get_info(self):
@@ -96,7 +106,7 @@ class VidurSimulatorEnv(gym.Env):
 
         self.last_step_time = 0.0
 
-        observation = self._get_obs()
+        observation = self._get_obs(replica_scheduler_states=[])
         info = self._get_info()
 
         return observation, info
@@ -121,8 +131,8 @@ class VidurSimulatorEnv(gym.Env):
         self.last_step_time = self.simulator.get_time()
 
         # terminate if overloads too much, and give a negative reward
-        observation = self._get_obs()
-        # reward = self.calc_reward(replica_scheduler_states)
+        observation = self._get_obs(replica_scheduler_states)
+        # reward = self._calc_reward(replica_scheduler_states)
         reward = 0.5
 
         if self.is_overloaded(replica_scheduler_states):
@@ -132,7 +142,7 @@ class VidurSimulatorEnv(gym.Env):
         return observation, reward, terminated, False, self._get_info()
 
     @staticmethod
-    def calc_reward(replica_scheduler_states: List[dict]) -> float:
+    def _calc_reward(replica_scheduler_states: List[dict]) -> float:
         if len(replica_scheduler_states) > 0:
             mean_waiting_queue_size = np.mean([s['waiting_queue_len']
                                                for s in replica_scheduler_states])

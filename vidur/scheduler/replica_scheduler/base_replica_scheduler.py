@@ -73,10 +73,9 @@ class BaseReplicaScheduler(ABC):
         self.execution_time_predictor = execution_time_predictor
         self.power_predictor = power_predictor
         self.freq: Optional[int] = None
-        # get_states() returns the power of the batch of the last finished
-        # batch, not the current in-execution batch
-        self._outstanding_batch_power: float = 0.0
-        self._latest_finished_batch_power: float = 0.0
+        self._last_batch_power: float = 0.0
+        self._last_batch_idle_duration: float = 0.0
+        self._last_batch_time: float = 0.0
 
     @property
     def num_pending_requests(self) -> int:
@@ -148,7 +147,14 @@ class BaseReplicaScheduler(ABC):
     def _get_next_batch(self) -> Batch:
         pass
 
-    def on_schedule(self) -> List[Batch]:
+    def on_schedule(self, time) -> List[Batch]:
+        # Record num running requests before actually performing the
+        # scheduling, otherwise requests will be taken out of the running queue
+        if hasattr(self, 'num_running_requests'):
+            running_queue_len = self.num_running_requests
+        else:
+            running_queue_len = 0
+
         scheduled_batches: List[Batch] = []
         while self._num_running_batches < self._num_stages:
             batch = self._get_next_batch()
@@ -157,31 +163,39 @@ class BaseReplicaScheduler(ABC):
             scheduled_batches.append(batch)
             self._num_running_batches += 1
 
-        # Only update `latest_finished_batch_power` only if a batch is actually
-        # scheduled
+        # Only update scheduler states if a batch is actually scheduled
         if len(scheduled_batches) > 0:
-            self._latest_finished_batch_power = self._outstanding_batch_power
+            # Power
             if self.execution_time_predictor.freq:
                 power_arr = [self.power_predictor.predict(p, self.execution_time_predictor.freq)
                              for p in scheduled_batches]
-                self._outstanding_batch_power = float(np.mean(power_arr))
+                self._last_batch_power = float(np.mean(power_arr))
             else:
                 print('WARNING: wreq is not yet set, setting predicted power to 0.0')
-                self._outstanding_batch_power = 0.0
-        return scheduled_batches
+                self._last_batch_power = 0.0
 
-    @property
-    def latest_finished_batch_power(self):
-        return self._latest_finished_batch_power
+            # Idle time
+            # TODO: Remove this hardcoded number profiled on A40 node
+            cpu_overhead_us = max(118.1656 * running_queue_len - 80.8321, 0)
+            self._last_batch_idle_duration = cpu_overhead_us / 1e6
+            self._last_batch_time = time
+        return scheduled_batches
 
     def set_freq(self, freq: int):
         self.freq = freq
         self.execution_time_predictor.set_freq(freq)
 
-    def get_states(self) -> dict:
+    def get_states(self, time: float) -> dict:
+        # This calculation assumes this function is called at the next
+        # scheduling step, before `on_schedule()` is called
+        last_batch_duration = time - self._last_batch_time - self._last_batch_idle_duration
+
         ret = {
             'waiting_queue_len': self.num_pending_requests,
             'memory_usage_percent': self.memory_usage_percent,
+            'last_batch_power': self._last_batch_power,
+            'last_batch_duration': last_batch_duration,
+            'last_batch_idle_duration': self._last_batch_idle_duration,
             'freq': self.execution_time_predictor.freq,
         }
         if hasattr(self, 'num_running_requests'):
