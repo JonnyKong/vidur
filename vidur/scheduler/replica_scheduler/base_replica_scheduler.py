@@ -1,17 +1,21 @@
-from abc import ABC, abstractmethod
-from typing import List, Optional
+from abc import ABC
+from abc import abstractmethod
+from typing import List
+from typing import Optional
 
-from vidur.config import (
-    BaseReplicaSchedulerConfig,
-    BaseRequestGeneratorConfig,
-    ReplicaConfig,
-)
-from vidur.entities import Batch, Replica, Request
+import numpy as np
+
+from vidur.config import BaseReplicaSchedulerConfig
+from vidur.config import BaseRequestGeneratorConfig
+from vidur.config import ReplicaConfig
+from vidur.entities import Batch
+from vidur.entities import Replica
+from vidur.entities import Request
 from vidur.execution_time_predictor import BaseExecutionTimePredictor
 from vidur.logger import init_logger
+from vidur.power_predictor import BasePowerPredictor
 from vidur.scheduler.replica_stage_scheduler import ReplicaStageScheduler
 from vidur.scheduler.utils.memory_planner import MemoryPlanner
-from vidur.power_predictor import BasePowerPredictor
 
 logger = init_logger(__name__)
 
@@ -69,6 +73,10 @@ class BaseReplicaScheduler(ABC):
         self.execution_time_predictor = execution_time_predictor
         self.power_predictor = power_predictor
         self.freq: Optional[int] = None
+        # get_states() returns the power of the batch of the last finished
+        # batch, not the current in-execution batch
+        self._outstanding_batch_power: float = 0.0
+        self._latest_finished_batch_power: float = 0.0
 
     @property
     def num_pending_requests(self) -> int:
@@ -141,22 +149,30 @@ class BaseReplicaScheduler(ABC):
         pass
 
     def on_schedule(self) -> List[Batch]:
-        scheduled_batches = []
+        scheduled_batches: List[Batch] = []
         while self._num_running_batches < self._num_stages:
             batch = self._get_next_batch()
             if not batch:
                 break
             scheduled_batches.append(batch)
             self._num_running_batches += 1
+
+        # Only update `latest_finished_batch_power` only if a batch is actually
+        # scheduled
+        if len(scheduled_batches) > 0:
+            self._latest_finished_batch_power = self._outstanding_batch_power
+            if self.execution_time_predictor.freq:
+                power_arr = [self.power_predictor.predict(p, self.execution_time_predictor.freq)
+                             for p in scheduled_batches]
+                self._outstanding_batch_power = float(np.mean(power_arr))
+            else:
+                print('WARNING: wreq is not yet set, setting predicted power to 0.0')
+                self._outstanding_batch_power = 0.0
         return scheduled_batches
 
-    def predict_power(self, batches: List[Batch]):
-        if not self.freq:
-            print('WARNING: freq is unset, returning predicted power as 0')
-            return 0.0
-        else:
-            return [self.power_predictor.predict(b, self.freq)
-                    for b in batches]
+    @property
+    def latest_finished_batch_power(self):
+        return self._latest_finished_batch_power
 
     def set_freq(self, freq: int):
         self.freq = freq
@@ -167,7 +183,7 @@ class BaseReplicaScheduler(ABC):
             'waiting_queue_len': self.num_pending_requests,
             'memory_usage_percent': self.memory_usage_percent,
             'freq': self.execution_time_predictor.freq,
-        } 
+        }
         if hasattr(self, 'num_running_requests'):
             ret['running_queue_len'] = self.num_running_requests
         return ret

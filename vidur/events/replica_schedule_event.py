@@ -1,3 +1,4 @@
+from typing import Dict
 from typing import List
 
 from vidur.events import BaseEvent
@@ -16,6 +17,8 @@ class ReplicaScheduleEvent(BaseEvent):
         self._replica_id = replica_id
 
         self._batches = []
+        self.scheduler_states: Dict = {}
+        self.last_batch_power: float = 0.0
 
     def handle_event(
         self, scheduler: BaseGlobalScheduler, metrics_store: MetricsStore
@@ -34,8 +37,7 @@ class ReplicaScheduleEvent(BaseEvent):
         if not self._batches:
             return []
 
-        _powers = replica_scheduler.predict_power(self._batches)
-        print('Predicted power: ', _powers)
+        self.last_batch_power = replica_scheduler.latest_finished_batch_power
 
         memory_usage_percent = replica_scheduler.memory_usage_percent
         metrics_store.on_replica_schedule(
@@ -73,6 +75,7 @@ class ReplicaScheduleEvent(BaseEvent):
                 "event_type": self.event_type,
                 "replica_id": self._replica_id,
                 "batch_ids": [batch.id for batch in self._batches],
+                "last_batch_power": self.last_batch_power,
                 **self.scheduler_states,
             }
 
@@ -86,5 +89,8 @@ class ReplicaScheduleEvent(BaseEvent):
                 "ts": self.time * 1e6,
                 "pid": 0,
                 "tid": 0,
-                "args": self.scheduler_states,
+                "args": {
+                    "last_batch_power": self.last_batch_power,
+                    **self.scheduler_states,
+                },
             }
