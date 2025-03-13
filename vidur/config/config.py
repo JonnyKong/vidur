@@ -689,8 +689,8 @@ class SimulationConfig(ABC):
         default_factory=DummyPowerPredictorConfig,
         metadata={"help": "Power predictor config."},
     )
-    latency_frequency_predictor_model_path: str = field(
-        default="",
+    latency_frequency_predictor_model_path: Optional[str] = field(
+        default=None,
         metadata={"help": "Path to the frequency based latency predictor model."},
     )
 
