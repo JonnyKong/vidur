@@ -16,3 +16,8 @@ class BasePowerPredictor(ABC):
     @abstractmethod
     def predict(self, batch: Batch, freq: int) -> float:
         pass
+
+    def predict_idle_power(self) -> float:
+        # TODO: remove hardcoded tdp
+        a40_tdp = 300.0
+        return 0.25 * a40_tdp

@@ -73,9 +73,10 @@ class BaseReplicaScheduler(ABC):
         self.execution_time_predictor = execution_time_predictor
         self.power_predictor = power_predictor
         self.freq: Optional[int] = None
-        self._last_batch_power: float = 0.0
+        self._last_batch_busy_power: float = 0.0
+        self._last_batch_idle_power: float = 0.0
         self._last_batch_idle_duration: float = 0.0
-        self._last_batch_time: float = 0.0
+        self._last_batch_timestamp: float = 0.0
 
     @property
     def num_pending_requests(self) -> int:
@@ -169,16 +170,17 @@ class BaseReplicaScheduler(ABC):
             if self.execution_time_predictor.freq:
                 power_arr = [self.power_predictor.predict(p, self.execution_time_predictor.freq)
                              for p in scheduled_batches]
-                self._last_batch_power = float(np.mean(power_arr))
+                self._last_batch_busy_power = float(np.mean(power_arr))
             else:
                 print('WARNING: wreq is not yet set, setting predicted power to 0.0')
-                self._last_batch_power = 0.0
+                self._last_batch_busy_power = 0.0
+            self._last_batch_idle_power = self.power_predictor.predict_idle_power()
 
             # Idle time
             # TODO: Remove this hardcoded number profiled on A40 node
             cpu_overhead_us = max(118.1656 * running_queue_len - 80.8321, 0)
             self._last_batch_idle_duration = cpu_overhead_us / 1e6
-            self._last_batch_time = time
+            self._last_batch_timestamp = time
         return scheduled_batches
 
     def set_freq(self, freq: int):
@@ -189,16 +191,25 @@ class BaseReplicaScheduler(ABC):
         self.execution_time_predictor.set_latency_frequency_predictor_model_path(path)
 
     def get_states(self, time: float) -> dict:
-        # This calculation assumes this function is called at the next
+        # Busy duration assumes this function is called at the next
         # scheduling step, before `on_schedule()` is called
-        last_batch_duration = time - self._last_batch_time - self._last_batch_idle_duration
+        last_batch_busy_duration = (time - self._last_batch_timestamp - 
+                                    self._last_batch_idle_duration)
+
+        # Avg power is weighted avg over busy + idle
+        last_batch_total_energy = (last_batch_busy_duration * self._last_batch_busy_power + 
+                                   self._last_batch_idle_duration * self._last_batch_idle_power)
+        last_batch_total_duration = last_batch_busy_duration + self._last_batch_idle_duration
+        last_batch_avg_power = last_batch_total_energy / last_batch_total_duration
 
         ret = {
             'waiting_queue_len': self.num_pending_requests,
             'memory_usage_percent': self.memory_usage_percent,
-            'last_batch_power': self._last_batch_power,
-            'last_batch_duration': last_batch_duration,
+            'last_batch_busy_power': self._last_batch_busy_power,
+            'last_batch_busy_duration': last_batch_busy_duration,
+            'last_batch_idle_power': self._last_batch_idle_power,
             'last_batch_idle_duration': self._last_batch_idle_duration,
+            'last_batch_avg_power': last_batch_avg_power,
             'freq': self.execution_time_predictor.freq,
         }
         if hasattr(self, 'num_running_requests'):

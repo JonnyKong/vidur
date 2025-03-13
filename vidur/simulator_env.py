@@ -9,6 +9,7 @@ from vidur.config import SimulationConfig
 from vidur.simulator import Simulator
 
 A40_FREQ_CHOICES = [210, 360, 510, 675, 825, 975, 1125, 1275, 1440, 1590, 1740]
+A40_TDP = 300
 
 
 class VidurSimulatorEnv(gym.Env):
@@ -66,13 +67,15 @@ class VidurSimulatorEnv(gym.Env):
     @staticmethod
     def _get_obs(replica_scheduler_states: List[dict]):
         if len(replica_scheduler_states) == 0:
-            return np.array([0.0, 0.0, 300.0])
+            return np.array([0.0, 0.0, A40_TDP], dtype=float32)
 
-        total_energy = np.sum([s['last_batch_power'] * s['last_batch_duration']
-                            for s in replica_scheduler_states])
-        total_duration = np.sum([s['last_batch_duration'] + s['last_batch_idle_duration']
+        busy_energy = np.sum([s['last_batch_busy_power'] * s['last_batch_busy_duration']
+                              for s in replica_scheduler_states])
+        idle_energy = np.sum([s['last_batch_idle_power'] * s['last_batch_idle_duration']
+                              for s in replica_scheduler_states])
+        total_duration = np.sum([s['last_batch_busy_duration'] + s['last_batch_idle_duration']
                                 for s in replica_scheduler_states])
-        avg_power = total_energy / total_duration
+        avg_power = (busy_energy + idle_energy) / total_duration
 
         latest_state = replica_scheduler_states[-1]
         return np.array([
