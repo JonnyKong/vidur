@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from sklearn.ensemble import GradientBoostingRegressor
 
 from vidur.config import BaseExecutionTimePredictorConfig
 from vidur.config import BaseReplicaSchedulerConfig
@@ -101,8 +100,6 @@ class BaseExecutionTimePredictor(ABC):
                 latency_from_freq_model = self._latency_freq_model_hybrid.predict(
                     model_input_hybrid)
             latency_from_freq_model = latency_from_freq_model.item()
-            # if latency_from_freq_model <= 0:
-            #     breakpoint()
             assert latency_from_freq_model > 0
             t = ExecutionTime(
                 self._num_layers_per_pipeline_stage,
