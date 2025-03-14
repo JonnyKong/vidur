@@ -78,22 +78,32 @@ class BaseExecutionTimePredictor(ABC):
             decode_len_max = np.max(decode_lens) if decode_batch_size > 0 else 0
 
             if prefill_batch_size > 0 and decode_batch_size == 0:
-                model_input_prefill = np.array(
-                    [freq, prefill_batch_size, prefill_len_sum, prefill_len_max, prefill_len_std]).reshape(1, -1)
+                model_input_prefill = np.array([
+                    freq,
+                    prefill_batch_size, prefill_len_sum, prefill_len_std, prefill_len_max,
+                ]).reshape(1, -1)
                 latency_from_freq_model = self._latency_freq_model_prefill.predict(
                     model_input_prefill)
 
             elif prefill_batch_size == 0 and decode_batch_size > 0:
-                model_input_decode = np.array(
-                    [freq, decode_batch_size, decode_len_sum, decode_len_max, decode_len_std]).reshape(1, -1)
+                model_input_decode = np.array([
+                    freq,
+                    decode_batch_size, decode_len_sum, decode_len_std, decode_len_max,
+                ]).reshape(1, -1)
                 latency_from_freq_model = self._latency_freq_model_decode.predict(
                     model_input_decode)
             else:
-                model_input_hybrid = np.array([freq, decode_batch_size, prefill_batch_size, decode_len_sum,
-                                              prefill_len_sum, decode_len_max, prefill_len_max, decode_len_std, prefill_len_std]).reshape(1, -1)
+                model_input_hybrid = np.array([
+                    freq,
+                    prefill_batch_size, prefill_len_sum, prefill_len_std, prefill_len_max,
+                    decode_batch_size, decode_len_sum, decode_len_std, decode_len_max,
+                ]).reshape(1, -1)
                 latency_from_freq_model = self._latency_freq_model_hybrid.predict(
                     model_input_hybrid)
             latency_from_freq_model = latency_from_freq_model.item()
+            # if latency_from_freq_model <= 0:
+            #     breakpoint()
+            assert latency_from_freq_model > 0
             t = ExecutionTime(
                 self._num_layers_per_pipeline_stage,
                 0.0,

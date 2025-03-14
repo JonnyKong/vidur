@@ -138,12 +138,12 @@ class Batch(BaseEntity):
 
     @property
     def prefill_lens(self) -> List[int]:
-        return [t for r, t in zip(self.requests, self._num_tokens)
+        return [r.num_prefill_tokens for r in self.requests
                 if not r.is_prefill_complete]
 
     @property
     def decode_lens(self) -> List[int]:
-        return [t for r, t in zip(self.requests, self._num_tokens)
+        return [r.num_processed_tokens for r in self.requests
                 if r.is_prefill_complete]
 
     def to_dict(self) -> dict:
