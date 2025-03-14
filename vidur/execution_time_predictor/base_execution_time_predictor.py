@@ -1,16 +1,18 @@
-from abc import ABC, abstractmethod
-from typing import Optional
-import numpy as np
 import pickle
+from abc import ABC
+from abc import abstractmethod
+from pathlib import Path
+from typing import Optional
+
+import numpy as np
 from sklearn.ensemble import GradientBoostingRegressor
 
-from vidur.config import (
-    BaseExecutionTimePredictorConfig,
-    BaseReplicaSchedulerConfig,
-    MetricsConfig,
-    ReplicaConfig,
-)
-from vidur.entities import Batch, ExecutionTime
+from vidur.config import BaseExecutionTimePredictorConfig
+from vidur.config import BaseReplicaSchedulerConfig
+from vidur.config import MetricsConfig
+from vidur.config import ReplicaConfig
+from vidur.entities import Batch
+from vidur.entities import ExecutionTime
 from vidur.logger import init_logger
 
 logger = init_logger(__name__)
@@ -43,8 +45,6 @@ class BaseExecutionTimePredictor(ABC):
         self._latency_freq_model_prefill = None
         self._latency_freq_model_decode = None
         self._latency_freq_model_hybrid = None
-        
-
 
     def get_execution_time(self, batch: Batch, pipeline_stage: int) -> ExecutionTime:
         if pipeline_stage == self._replica_config.num_pipeline_stages - 1:
@@ -77,16 +77,22 @@ class BaseExecutionTimePredictor(ABC):
             decode_len_std = np.std(decode_lens) if decode_batch_size > 0 else 0.0
             decode_len_max = np.max(decode_lens) if decode_batch_size > 0 else 0
 
-            if (prefill_batch_size > 0) and (decode_batch_size == 0):
-                model_input_prefill = np.array([freq, prefill_batch_size, prefill_len_sum, prefill_len_max, prefill_len_std]).reshape(1, -1)
-                latency_from_freq_model = self._latency_freq_model_prefill.predict(model_input_prefill)
-                
-            elif (prefill_batch_size == 0) and (decode_batch_size > 0):
-                model_input_decode = np.array([freq, decode_batch_size, decode_len_sum, decode_len_max, decode_len_std]).reshape(1, -1)
-                latency_from_freq_model = self._latency_freq_model_decode.predict(model_input_decode)
+            if prefill_batch_size > 0 and decode_batch_size == 0:
+                model_input_prefill = np.array(
+                    [freq, prefill_batch_size, prefill_len_sum, prefill_len_max, prefill_len_std]).reshape(1, -1)
+                latency_from_freq_model = self._latency_freq_model_prefill.predict(
+                    model_input_prefill)
+
+            elif prefill_batch_size == 0 and decode_batch_size > 0:
+                model_input_decode = np.array(
+                    [freq, decode_batch_size, decode_len_sum, decode_len_max, decode_len_std]).reshape(1, -1)
+                latency_from_freq_model = self._latency_freq_model_decode.predict(
+                    model_input_decode)
             else:
-                model_input_hybrid = np.array([freq, decode_batch_size, prefill_batch_size, decode_len_sum, prefill_len_sum, decode_len_max, prefill_len_max, decode_len_std, prefill_len_std]).reshape(1, -1)
-                latency_from_freq_model = self._latency_freq_model_hybrid.predict(model_input_hybrid)
+                model_input_hybrid = np.array([freq, decode_batch_size, prefill_batch_size, decode_len_sum,
+                                              prefill_len_sum, decode_len_max, prefill_len_max, decode_len_std, prefill_len_std]).reshape(1, -1)
+                latency_from_freq_model = self._latency_freq_model_hybrid.predict(
+                    model_input_hybrid)
             latency_from_freq_model = latency_from_freq_model.item()
             t = ExecutionTime(
                 self._num_layers_per_pipeline_stage,
@@ -222,18 +228,19 @@ class BaseExecutionTimePredictor(ABC):
         self.latency_frequency_predictor_model_path = path
         if self.latency_frequency_predictor_model_path:
             try:
-                with open(self.latency_frequency_predictor_model_path + "/batch_latency_predictor_A40-LLama3-8B_prefill-only.pkl", 'rb') as f:
+                with open(Path(self.latency_frequency_predictor_model_path) / 'latency_model_prefill-only.pkl', 'rb') as f:
                     self._latency_freq_model_prefill = pickle.load(f)
                     print("Loaded prefill model")
-                with open(self.latency_frequency_predictor_model_path + "/batch_latency_predictor_A40-LLama3-8B_decode-only.pkl", 'rb') as f:
+                with open(Path(self.latency_frequency_predictor_model_path) / 'latency_model_decode-only.pkl', 'rb') as f:
                     self._latency_freq_model_decode = pickle.load(f)
                     print("Loaded decode model")
-                with open(self.latency_frequency_predictor_model_path + "/batch_latency_predictor_A40-LLama3-8B_hybrid.pkl", 'rb') as f:
+                with open(Path(self.latency_frequency_predictor_model_path) / 'latency_model_hybrid.pkl', 'rb') as f:
                     self._latency_freq_model_hybrid = pickle.load(f)
                     print("Loaded hybrid model")
             except FileNotFoundError:
                 self._config.latency_frequency_predictor_enabled = None
-                logger.error(f"Latency frequency model not found at {self.latency_frequency_predictor_model_path}")
+                logger.error(
+                    f"Latency frequency model not found at {self.latency_frequency_predictor_model_path}")
 
     @staticmethod
     def scale_execution_time_by_freq(t: ExecutionTime, freq: int) -> None:

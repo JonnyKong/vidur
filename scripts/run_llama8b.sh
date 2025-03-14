@@ -24,5 +24,5 @@ python -m vidur.main \
     --random_forrest_execution_time_predictor_config_prediction_max_batch_size 2048 \
     --random_forrest_execution_time_predictor_config_prediction_max_tokens_per_request 16384 \
     --power_predictor_config_type gdbt \
-    --gdbt_power_predictor_config_model_input_file /export2/kong102/energy_efficient_serving_results/power_model/A40_llama3-8B.pkl \
-    --latency_frequency_predictor_model_path /export2/obasit/EnergyEfficientServing/vllm/benchmarks/profilers/
+    --gdbt_power_predictor_config_model_input_file artifacts/power_model/a40_llama8-3b/power_model.pkl \
+    --latency_frequency_predictor_model_path artifacts/latency_model/a40_llama8-3b
