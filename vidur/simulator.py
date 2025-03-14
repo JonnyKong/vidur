@@ -83,7 +83,10 @@ class Simulator:
         if self._config.metrics_config.enable_chrome_trace:
             chrome_trace = event.to_chrome_trace()
             if chrome_trace:
-                self._event_chrome_trace.append(chrome_trace)
+                if isinstance(chrome_trace, dict):
+                    self._event_chrome_trace.append(chrome_trace)
+                elif isinstance(chrome_trace, List):
+                    self._event_chrome_trace.extend(chrome_trace)
 
         # We make ReplicaScheduleEvent the unified place to return states, to
         # be used for calculating the rewards

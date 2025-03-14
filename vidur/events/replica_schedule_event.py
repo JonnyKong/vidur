@@ -77,7 +77,7 @@ class ReplicaScheduleEvent(BaseEvent):
             return None
         else:
             return {
-                "name": "",
+                "name": "stats",
                 "ph": "C",
                 "ts": self.time * 1e6,
                 "pid": 0,
