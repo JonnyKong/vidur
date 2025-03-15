@@ -104,9 +104,12 @@ class VidurSimulatorEnv(gym.Env):
         # Log chrome traces regularly
         self.config.metrics_config.enable_chrome_trace = (self.episode_id % 10 == 0)
 
-        self.simulator = Simulator(self.config)
         # Use highest freq in the beginning
+        self.simulator = Simulator(self.config)
         self.simulator.set_freq(max(self.freq_choices))
+        if self.config.latency_frequency_predictor_model_path:
+            self.simulator.set_latency_frequency_predictor_model_path(
+                self.config.latency_frequency_predictor_model_path)
 
         self.last_step_time = 0.0
 
