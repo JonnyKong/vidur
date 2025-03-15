@@ -48,7 +48,8 @@ class VidurSimulatorEnv(gym.Env):
             --no-metrics_config_store_utilization_metrics 
             --no-metrics_config_keep_individual_batch_metrics 
             --power_predictor_config_type gdbt 
-            --gdbt_power_predictor_config_model_input_file /export2/kong102/energy_efficient_serving_results/power_model/A40_llama3-8B.pkl 
+            --gdbt_power_predictor_config_model_input_file {Path(__file__).parent.parent}/artifacts/power_model/a40_llama8-3b/power_model.pkl 
+            --latency_frequency_predictor_model_path {Path(__file__).parent.parent}/artifacts/latency_model/a40_llama8-3b
         """
         self.step_size_seconds = step_size_seconds
 
@@ -67,7 +68,7 @@ class VidurSimulatorEnv(gym.Env):
     @staticmethod
     def _get_obs(replica_scheduler_states: List[dict]):
         if len(replica_scheduler_states) == 0:
-            return np.array([0.0, 0.0, A40_TDP], dtype=float32)
+            return np.array([0.0, 0.0, A40_TDP], dtype=np.float32)
 
         busy_energy = np.sum([s['last_batch_busy_power'] * s['last_batch_busy_duration']
                               for s in replica_scheduler_states])
