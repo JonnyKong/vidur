@@ -70,7 +70,7 @@ class VidurSimulatorEnv(gym.Env):
     @staticmethod
     def _get_obs(replica_scheduler_states: List[dict]):
         if len(replica_scheduler_states) == 0:
-            return np.array([0.0, 0.0, A40_TDP], dtype=np.float32)
+            return np.array([0.0, 0.0, 0.0], dtype=np.float32)
 
         busy_energy = np.sum([s['last_batch_busy_power'] * s['last_batch_busy_duration']
                               for s in replica_scheduler_states])
@@ -79,12 +79,13 @@ class VidurSimulatorEnv(gym.Env):
         total_duration = np.sum([s['last_batch_busy_duration'] + s['last_batch_idle_duration']
                                 for s in replica_scheduler_states])
         avg_power = (busy_energy + idle_energy) / total_duration
+        avg_power_util = avg_power / A40_TDP * 100
 
         latest_state = replica_scheduler_states[-1]
         return np.array([
             latest_state['memory_usage_percent'],
             latest_state['waiting_queue_len'],
-            avg_power,
+            avg_power_util,
         ], dtype=np.float32)
 
     def _get_info(self):
