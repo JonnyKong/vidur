@@ -1,4 +1,5 @@
 import json
+import sys
 from dataclasses import asdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,12 +13,22 @@ import pandas as pd
 class PerfStats:
     throughput: float   # Requests per second
     ttft_mean: float
-    ttft_median: float
     ttft_p99: float
     tbt_mean: float
-    tbt_median: float
     tbt_p99: float
     power_w: float
+    freq_mhz_mean: float
+    freq_mhz_p10: float
+    freq_mhz_p50: float
+    freq_mhz_p90: float
+    mem_util_mean: float
+    mem_util_p10: float
+    mem_util_p50: float
+    mem_util_p90: float
+    batch_size_mean: float
+    running_queue_len_mean: float
+    waiting_queue_len_mean: float
+    expr_duration_s: float
 
 
 def extract_steady_region(
@@ -107,12 +118,22 @@ def calc_perf_stats(df_stats: pd.DataFrame, df_requests: pd.DataFrame) -> PerfSt
     return PerfStats(
         throughput=throughput,
         ttft_mean=float(np.mean(ttft_arr)),
-        ttft_median=float(np.median(ttft_arr)),
         ttft_p99=float(percentile_or_nan(ttft_arr, q=99)),
         tbt_mean=float(np.mean(tbt_arr)),
-        tbt_median=float(np.median(tbt_arr)),
         tbt_p99=float(percentile_or_nan(tbt_arr, q=99)),
         power_w=power_w,
+        freq_mhz_mean=df_stats.freq.mean(),
+        freq_mhz_p10=df_stats.freq.quantile(q=0.1),
+        freq_mhz_p50=df_stats.freq.quantile(q=0.5),
+        freq_mhz_p90=df_stats.freq.quantile(q=0.9),
+        mem_util_mean=df_stats.memory_usage_percent.mean(),
+        mem_util_p10=df_stats.memory_usage_percent.quantile(q=0.1),
+        mem_util_p50=df_stats.memory_usage_percent.quantile(q=0.5),
+        mem_util_p90=df_stats.memory_usage_percent.quantile(q=0.9),
+        batch_size_mean=df_stats.batch_size.mean(),
+        running_queue_len_mean=df_stats.running_queue_len.mean(),
+        waiting_queue_len_mean=df_stats.waiting_queue_len.mean(),
+        expr_duration_s=(df_stats.ts.max() - df_stats.ts.min()) / 1e6,
     )
 
 
@@ -124,8 +145,10 @@ def percentile_or_nan(a, q):
 
 
 if __name__ == '__main__':
-    expr_root = Path(
-        '/export2/home/kong102/vidur/simulator_output')
+    if len(sys.argv) > 1:
+        expr_root = Path(sys.argv[1])
+    else:
+        expr_root = Path('/export2/home/kong102/vidur/simulator_output')
     df = []
 
     for expr_dir in sorted(expr_root.glob('*')):
@@ -133,11 +156,23 @@ if __name__ == '__main__':
             continue
         trace_path = expr_dir / 'chrome_trace.json'
 
-        df_stats, df_requests = load_trace_into_df(trace_path)
-        s = calc_perf_stats(df_stats, df_requests)
+        try:
+            df_stats, df_requests = load_trace_into_df(trace_path)
+            s = calc_perf_stats(df_stats, df_requests)
+        except FileNotFoundError:
+            print(f'WARNING: log not found, skipping: {trace_path}')
+            continue
+        except AssertionError:
+            print(f'WARNING: error parsing log, skipping: {trace_path}')
+            continue
 
         df.append({
             'expr_dir': expr_dir.name,
             **asdict(s),
         })
-    pd.DataFrame(df).to_csv(expr_root / 'metrics.csv', index=False)
+    try:
+        pd.DataFrame(df).to_csv(expr_root / 'metrics.csv', index=False)
+    except PermissionError:
+        save_path = Path.home() / 'metrics.csv'
+        pd.DataFrame(df).to_csv(save_path, index=False)
+        print(f'No permission to save to expr_dir. Saved to: {save_path}')
