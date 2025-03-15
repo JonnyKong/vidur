@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import List
 from typing import Optional
+import shutil
 
 import gymnasium as gym
 import numpy as np
@@ -47,6 +48,7 @@ class VidurSimulatorEnv(gym.Env):
             --no-metrics_config_store_batch_metrics 
             --no-metrics_config_store_utilization_metrics 
             --no-metrics_config_keep_individual_batch_metrics 
+            --no-metrics_config_enable_chrome_trace 
             --power_predictor_config_type gdbt 
             --gdbt_power_predictor_config_model_input_file {Path(__file__).parent.parent}/artifacts/power_model/a40_llama8-3b/power_model.pkl 
             --latency_frequency_predictor_model_path {Path(__file__).parent.parent}/artifacts/latency_model/a40_llama8-3b
@@ -90,10 +92,13 @@ class VidurSimulatorEnv(gym.Env):
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         if self.simulator:
-            self.simulator._write_output()
-            src_log_dir = Path(self.config.metrics_config.output_dir)
-            dst_log_dir = src_log_dir.parent / f'episode_{self.episode_id:06d}'
-            src_log_dir.rename(dst_log_dir)
+            if self.config.metrics_config.enable_chrome_trace:
+                self.simulator._write_output()
+                src_log_dir = Path(self.config.metrics_config.output_dir)
+                dst_log_dir = src_log_dir.parent / f'episode_{self.episode_id:06d}'
+                src_log_dir.rename(dst_log_dir)
+            else:
+                shutil.rmtree(self.config.metrics_config.output_dir)
 
         super().reset(seed=seed)
         self.episode_id += 1
@@ -102,7 +107,7 @@ class VidurSimulatorEnv(gym.Env):
         self.config.metrics_config.__post_init__()
 
         # Log chrome traces regularly
-        self.config.metrics_config.enable_chrome_trace = (self.episode_id % 10 == 0)
+        self.config.metrics_config.enable_chrome_trace = (self.episode_id % 50 == 0)
 
         # Use highest freq in the beginning
         self.simulator = Simulator(self.config)
