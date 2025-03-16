@@ -48,6 +48,10 @@ class Simulator:
             self._cluster.replicas,
         )
 
+        if config.latency_frequency_predictor_model_path:
+            self.scheduler.set_latency_frequency_predictor_model_path(
+                config.latency_frequency_predictor_model_path)
+
         self._init_event_queue()
 
     @property
@@ -97,9 +101,6 @@ class Simulator:
 
     def set_freq(self, freq: int) -> None:
         self._scheduler.set_freq(freq)
-
-    def set_latency_frequency_predictor_model_path(self, path: str) -> None:
-        self._scheduler.set_latency_frequency_predictor_model_path(path)
 
     def _write_output(self) -> None:
         logger.info("Writing output")

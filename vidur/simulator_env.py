@@ -113,9 +113,6 @@ class VidurSimulatorEnv(gym.Env):
         # Use highest freq in the beginning
         self.simulator = Simulator(self.config)
         self.simulator.set_freq(max(self.freq_choices))
-        if self.config.latency_frequency_predictor_model_path:
-            self.simulator.set_latency_frequency_predictor_model_path(
-                self.config.latency_frequency_predictor_model_path)
 
         self.last_step_time = 0.0
 

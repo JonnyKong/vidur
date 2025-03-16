@@ -39,7 +39,7 @@ class BaseExecutionTimePredictor(ABC):
 
         self.freq: Optional[int] = None
 
-        self.latency_frequency_predictor_model_path = None
+        self.latency_frequency_predictor_enabled: bool = False
 
         self._latency_freq_model_prefill = None
         self._latency_freq_model_decode = None
@@ -61,7 +61,7 @@ class BaseExecutionTimePredictor(ABC):
             )
 
         latency_from_freq_model = 0
-        if self.latency_frequency_predictor_model_path is not None:
+        if self.latency_frequency_predictor_enabled:
             freq = self.freq
             prefill_lens = batch.prefill_lens
             decode_lens = batch.decode_lens
@@ -148,8 +148,6 @@ class BaseExecutionTimePredictor(ABC):
                 self._get_ray_comm_time(batch),
                 latency_from_freq_model,
             )
-            if self.freq is not None:
-                self.scale_execution_time_by_freq(t, self.freq)
         return t
 
     @abstractmethod
@@ -232,58 +230,21 @@ class BaseExecutionTimePredictor(ABC):
         self.freq = freq
 
     def set_latency_frequency_predictor_model_path(self, path: str):
-        self.latency_frequency_predictor_model_path = path
-        if self.latency_frequency_predictor_model_path:
-            try:
-                with open(Path(self.latency_frequency_predictor_model_path) / 'latency_model_prefill-only.pkl', 'rb') as f:
-                    self._latency_freq_model_prefill = pickle.load(f)
-                    print("Loaded prefill model")
-                with open(Path(self.latency_frequency_predictor_model_path) / 'latency_model_decode-only.pkl', 'rb') as f:
-                    self._latency_freq_model_decode = pickle.load(f)
-                    print("Loaded decode model")
-                with open(Path(self.latency_frequency_predictor_model_path) / 'latency_model_hybrid.pkl', 'rb') as f:
-                    self._latency_freq_model_hybrid = pickle.load(f)
-                    print("Loaded hybrid model")
-            except FileNotFoundError:
-                self._config.latency_frequency_predictor_enabled = None
-                logger.error(
-                    f"Latency frequency model not found at {self.latency_frequency_predictor_model_path}")
-
-    @staticmethod
-    def scale_execution_time_by_freq(t: ExecutionTime, freq: int) -> None:
-        factor = {
-            210: 5.0,
-            360: 3.5,
-            510: 2.5,
-            675: 2.0,
-            825: 1.50,
-            975: 1.30,
-            1125: 1.15,
-            1275: 1.08,
-            1440: 1.05,
-            1590: 1.02,
-            1740: 1.00,
-        }[freq]
-        BaseExecutionTimePredictor.scale_execution_time_by_factor(t, factor)
-
-    @staticmethod
-    def scale_execution_time_by_factor(t: ExecutionTime, factor: float) -> None:
-        t._attention_rope_execution_time *= factor
-        t._attention_kv_cache_save_execution_time *= factor
-        t._attention_decode_execution_time *= factor
-        t._attention_prefill_execution_time *= factor
-        t._attention_layer_pre_proj_execution_time *= factor
-        t._attention_layer_post_proj_execution_time *= factor
-        t._mlp_layer_up_proj_execution_time *= factor
-        t._mlp_layer_down_proj_execution_time *= factor
-        t._mlp_layer_act_execution_time *= factor
-        t._attn_norm_time *= factor
-        t._mlp_norm_time *= factor
-        t._add_time *= factor
-        t._tensor_parallel_communication_time *= factor
-        t._pipeline_parallel_communication_time *= factor
-        t._schedule_time *= factor
-        t._sampler_e2e_time *= factor
-        t._prepare_inputs_e2e_time *= factor
-        t._process_model_outputs_time *= factor
-        t._ray_comm_time *= factor
+        if self._latency_freq_model_prefill:
+            print('Latency frequency model already loaded, skipping re-loading')
+            return
+        try:
+            print('Loading latency frequency model ...')
+            with open(Path(path) / 'latency_model_prefill-only.pkl', 'rb') as f:
+                self._latency_freq_model_prefill = pickle.load(f)
+                print("Loaded prefill model")
+            with open(Path(path) / 'latency_model_decode-only.pkl', 'rb') as f:
+                self._latency_freq_model_decode = pickle.load(f)
+                print("Loaded decode model")
+            with open(Path(path) / 'latency_model_hybrid.pkl', 'rb') as f:
+                self._latency_freq_model_hybrid = pickle.load(f)
+                print("Loaded hybrid model")
+            self.latency_frequency_predictor_enabled = True
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"Load latency frequency model not found at: {path}")

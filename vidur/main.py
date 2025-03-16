@@ -10,9 +10,6 @@ def main() -> None:
 
     simulator = Simulator(config)
     simulator.set_freq(1740)
-    if config.latency_frequency_predictor_model_path:
-        simulator.set_latency_frequency_predictor_model_path(
-            config.latency_frequency_predictor_model_path)
     simulator.run()
 
 
