@@ -231,19 +231,19 @@ class BaseExecutionTimePredictor(ABC):
 
     def set_latency_frequency_predictor_model_path(self, path: str):
         if self._latency_freq_model_prefill:
-            print('Latency frequency model already loaded, skipping re-loading')
+            logger.info('Latency frequency model already loaded, skipping re-loading')
             return
         try:
             print('Loading latency frequency model ...')
             with open(Path(path) / 'latency_model_prefill-only.pkl', 'rb') as f:
                 self._latency_freq_model_prefill = pickle.load(f)
-                print("Loaded prefill model")
+                logger.info("Loaded prefill model")
             with open(Path(path) / 'latency_model_decode-only.pkl', 'rb') as f:
                 self._latency_freq_model_decode = pickle.load(f)
-                print("Loaded decode model")
+                logger.info("Loaded decode model")
             with open(Path(path) / 'latency_model_hybrid.pkl', 'rb') as f:
                 self._latency_freq_model_hybrid = pickle.load(f)
-                print("Loaded hybrid model")
+                logger.info("Loaded hybrid model")
             self.latency_frequency_predictor_enabled = True
         except FileNotFoundError:
             raise FileNotFoundError(

@@ -6,9 +6,12 @@ from vidur.execution_time_predictor.linear_regression_execution_time_predictor i
 from vidur.execution_time_predictor.random_forrest_execution_time_predictor import (
     RandomForrestExecutionTimePredictor,
 )
+from vidur.logger import init_logger
 from vidur.types import BaseIntEnum
 from vidur.types import ExecutionTimePredictorType
 from vidur.utils.base_registry import BaseRegistry
+
+logger = init_logger(__name__)
 
 
 class ExecutionTimePredictorRegistry(BaseRegistry):
@@ -21,11 +24,12 @@ class ExecutionTimePredictorRegistry(BaseRegistry):
     @classmethod
     def get(cls, key: BaseIntEnum, *args, **kwargs) -> Any:
         if cls.cached_predictor is None:
-            print('Loading ExecutionTimePredictor from disk ...')
+            logger.info('Loading ExecutionTimePredictor from disk ...')
             cls.cached_predictor = super().get(key, *args, **kwargs)
         else:
-            print('Using cached ExecutionTimePredictor')
+            logger.info('Using cached ExecutionTimePredictor')
         return cls.cached_predictor
+
 
 ExecutionTimePredictorRegistry.register(
     ExecutionTimePredictorType.RANDOM_FORREST, RandomForrestExecutionTimePredictor
