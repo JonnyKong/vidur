@@ -142,12 +142,13 @@ class VidurSimulatorEnv(gym.Env):
 
         # terminate if overloads too much, and give a negative reward
         observation = self._get_obs(replica_scheduler_states)
-        # reward = self._calc_reward(replica_scheduler_states)
-        reward = 0.5
+        reward = self._calc_reward(replica_scheduler_states)
+        # reward = 0.5
 
         if self.is_overloaded(replica_scheduler_states):
             print('Env terminated because waiting queue grows too long')
             terminated = True
+            reward = -1.0
 
         return observation, reward, terminated, False, self._get_info()
 
@@ -156,7 +157,20 @@ class VidurSimulatorEnv(gym.Env):
         if len(replica_scheduler_states) > 0:
             mean_waiting_queue_size = np.mean([s['waiting_queue_len']
                                                for s in replica_scheduler_states])
-            return float(1.0 - mean_waiting_queue_size / (mean_waiting_queue_size + 20))
+            busy_energy = np.sum([s['last_batch_busy_power'] * s['last_batch_busy_duration']
+                              for s in replica_scheduler_states])
+            idle_energy = np.sum([s['last_batch_idle_power'] * s['last_batch_idle_duration']
+                                for s in replica_scheduler_states])
+            total_duration = np.sum([s['last_batch_busy_duration'] + s['last_batch_idle_duration']
+                                    for s in replica_scheduler_states])
+            tbt_p99 = np.percentile([s['last_batch_busy_duration'] + s['last_batch_idle_duration']
+                                    for s in replica_scheduler_states], 99) 
+            avg_power = (busy_energy + idle_energy) / total_duration
+            tbt = np.sum([s['last_batch_busy_duration'] + s['last_batch_idle_duration']
+                                for s in replica_scheduler_states])
+
+            reward = (1 - (avg_power / A40_TDP)) - (0.05 * mean_waiting_queue_size)
+            return reward
         else:
             return 0.0
 
