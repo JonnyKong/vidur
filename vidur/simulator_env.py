@@ -1,7 +1,7 @@
+import shutil
 from pathlib import Path
 from typing import List
 from typing import Optional
-import shutil
 
 import gymnasium as gym
 import numpy as np
@@ -14,7 +14,7 @@ A40_TDP = 300
 
 
 class VidurSimulatorEnv(gym.Env):
-    def __init__(self, step_size_seconds: float = 1.0):
+    def __init__(self, env_idx: int = 0, step_size_seconds: float = 1.0):
         current_file_path = Path(__file__)
         project_root_path = current_file_path.parent.parent
 
@@ -53,6 +53,7 @@ class VidurSimulatorEnv(gym.Env):
             --gdbt_power_predictor_config_model_input_file {Path(__file__).parent.parent}/artifacts/power_model/a40_llama8-3b/power_model.pkl 
             --latency_frequency_predictor_model_path {Path(__file__).parent.parent}/artifacts/latency_model/a40_llama8-3b
         """
+        self.env_idx = env_idx
         self.step_size_seconds = step_size_seconds
 
         self.observation_space = gym.spaces.Box(0, 100, shape=(3,))
@@ -99,7 +100,7 @@ class VidurSimulatorEnv(gym.Env):
                 dst_log_dir = src_log_dir.parent / f'episode_{self.episode_id:06d}'
                 src_log_dir.rename(dst_log_dir)
             else:
-                shutil.rmtree(self.config.metrics_config.output_dir)
+                shutil.rmtree(self.config.metrics_config.output_dir, ignore_errors=True)
 
         super().reset(seed=seed)
         self.episode_id += 1
@@ -108,7 +109,8 @@ class VidurSimulatorEnv(gym.Env):
         self.config.metrics_config.__post_init__()
 
         # Log chrome traces regularly
-        self.config.metrics_config.enable_chrome_trace = (self.episode_id % 50 == 0)
+        self.config.metrics_config.enable_chrome_trace = (
+            self.env_idx == 0 and self.episode_id % 50 == 0)
 
         # Use highest freq in the beginning
         self.simulator = Simulator(self.config)
@@ -158,16 +160,16 @@ class VidurSimulatorEnv(gym.Env):
             mean_waiting_queue_size = np.mean([s['waiting_queue_len']
                                                for s in replica_scheduler_states])
             busy_energy = np.sum([s['last_batch_busy_power'] * s['last_batch_busy_duration']
-                              for s in replica_scheduler_states])
+                                  for s in replica_scheduler_states])
             idle_energy = np.sum([s['last_batch_idle_power'] * s['last_batch_idle_duration']
-                                for s in replica_scheduler_states])
+                                  for s in replica_scheduler_states])
             total_duration = np.sum([s['last_batch_busy_duration'] + s['last_batch_idle_duration']
                                     for s in replica_scheduler_states])
             tbt_p99 = np.percentile([s['last_batch_busy_duration'] + s['last_batch_idle_duration']
-                                    for s in replica_scheduler_states], 99) 
+                                    for s in replica_scheduler_states], 99)
             avg_power = (busy_energy + idle_energy) / total_duration
             tbt = np.sum([s['last_batch_busy_duration'] + s['last_batch_idle_duration']
-                                for s in replica_scheduler_states])
+                          for s in replica_scheduler_states])
 
             reward = (1 - (avg_power / A40_TDP)) - (0.05 * mean_waiting_queue_size)
             return reward
