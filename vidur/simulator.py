@@ -79,8 +79,9 @@ class Simulator:
         new_events = event.handle_event(self._scheduler, self._metric_store)
         self._add_events(new_events)
     
-        if len(self._event_queue) == 1:
+        if self._config.auto_replenish_requests and len(self._event_queue) == 1:
             self._replenish_event_queue(event._time + 0.1)
+            self._write_output()
             print(f"Replenishing the event queue with {len(self._event_queue)} requests")
 
         if self._config.metrics_config.write_json_trace:

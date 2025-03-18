@@ -693,6 +693,10 @@ class SimulationConfig(ABC):
         default=None,
         metadata={"help": "Path to the frequency based latency predictor model."},
     )
+    auto_replenish_requests: bool = field(
+        default=False,
+        metadata={"help": "Auto replenish requests."},
+    )
 
     def __post_init__(self):
         self.write_config_to_file()

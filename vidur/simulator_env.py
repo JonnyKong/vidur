@@ -53,7 +53,8 @@ class VidurSimulatorEnv(gym.Env):
             --power_predictor_config_type gdbt 
             --gdbt_power_predictor_config_model_input_file {Path(__file__).parent.parent}/artifacts/power_model/a40_llama8-3b/power_model.pkl 
             --latency_frequency_predictor_model_path {Path(__file__).parent.parent}/artifacts/latency_model/a40_llama8-3b 
-            --metrics_config_output_dir_root {log_dir}
+            --metrics_config_output_dir_root {log_dir} 
+            --auto_replenish_requests 
         """
         self.env_idx = env_idx
         self.step_size_seconds = step_size_seconds
