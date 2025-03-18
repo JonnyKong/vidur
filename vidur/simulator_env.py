@@ -15,7 +15,7 @@ A40_TDP = 300
 
 class VidurSimulatorEnv(gym.Env):
     def __init__(self, env_idx: int = 0, step_size_seconds: float = 1.0,
-                 log_dir: str='./simulator_outputs'):
+                 log_dir: str='./simulator_outputs', extra_vidur_args_str=''):
         current_file_path = Path(__file__)
         project_root_path = current_file_path.parent.parent
 
@@ -54,7 +54,6 @@ class VidurSimulatorEnv(gym.Env):
             --gdbt_power_predictor_config_model_input_file {Path(__file__).parent.parent}/artifacts/power_model/a40_llama8-3b/power_model.pkl 
             --latency_frequency_predictor_model_path {Path(__file__).parent.parent}/artifacts/latency_model/a40_llama8-3b 
             --metrics_config_output_dir_root {log_dir} 
-            --auto_replenish_requests 
         """
         self.env_idx = env_idx
         self.step_size_seconds = step_size_seconds
@@ -67,7 +66,8 @@ class VidurSimulatorEnv(gym.Env):
         self.episode_id = -1
 
         # These will be initialized on every reset()
-        self.config: SimulationConfig = SimulationConfig.create_from_args_str(args_str)
+        self.config: SimulationConfig = SimulationConfig.create_from_args_str(
+                args_str + ' ' + extra_vidur_args_str)
         self.simulator: Optional[Simulator] = None
         self.last_step_time: float = 0.0
 
