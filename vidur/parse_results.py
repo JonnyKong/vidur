@@ -92,12 +92,14 @@ def load_trace_into_df(trace_path: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
     df_batches = pd.DataFrame(df_batches)
     df_requests = pd.DataFrame(df_requests)
 
-    # Merge df_batches into df_stats, since they have one-to-one correspondence
-    assert len(df_stats) == len(df_batches)
+    assert (
+        len(df_stats) == len(df_batches)    # Simulator terminated gracefully
+        or len(df_stats) == len(df_batches) + 1 # Terminated early
+    )
     assert df_stats.ts.is_monotonic_increasing
     assert df_batches.ts.is_monotonic_increasing
     df_batches = df_batches.drop('ts', axis=1)
-    df_stats = df_stats.join(df_batches)
+    df_stats = df_stats.join(df_batches, how='inner')
 
     df_stats, df_requests = extract_steady_region(df_stats, df_requests)
     return df_stats, df_requests
