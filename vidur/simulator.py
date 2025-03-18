@@ -66,14 +66,12 @@ class Simulator:
         logger.info(
             f"Starting simulation with cluster: {self._cluster} and {len(self._event_queue)} requests"
         )
-
-        while self._event_queue and not self._terminate:
-            _ = self.step()
-
-        assert self._scheduler.is_empty() or self._terminate
-
-        logger.info(f"Simulation ended at: {self._time}s")
-        self._write_output()
+        try:
+            while self._event_queue and not self._terminate:
+                _ = self.step()
+        finally:
+            logger.info(f"Simulation ended at: {self._time}s")
+            self._write_output()
 
     def step(self) -> Optional[dict]:
         _, event = heapq.heappop(self._event_queue)
