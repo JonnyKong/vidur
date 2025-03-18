@@ -107,9 +107,6 @@ class VidurSimulatorEnv(gym.Env):
         super().reset(seed=seed)
         self.episode_id += 1
 
-        # This will re-create logging dir with a new timestamp
-        self.config.metrics_config.__post_init__()
-
         # Log chrome traces regularly
         self.config.metrics_config.enable_chrome_trace = (
             self.env_idx == 0 and self.episode_id % 50 == 0)
