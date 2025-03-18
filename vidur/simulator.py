@@ -82,7 +82,7 @@ class Simulator:
         self._add_events(new_events)
     
         if len(self._event_queue) == 1:
-            self._replensih_event_queue(event._time + 0.1)
+            self._replenish_event_queue(event._time + 0.1)
             print(f"Replenishing the event queue with {len(self._event_queue)} requests")
 
         if self._config.metrics_config.write_json_trace:
@@ -133,7 +133,7 @@ class Simulator:
         for request in requests:
             self._add_event(RequestArrivalEvent(request.arrived_at, request))
 
-    def _replensih_event_queue(self, base_time) -> None:
+    def _replenish_event_queue(self, base_time) -> None:
         requests = self._request_generator.generate()
 
         for request in requests:
