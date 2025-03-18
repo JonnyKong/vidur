@@ -14,7 +14,8 @@ A40_TDP = 300
 
 
 class VidurSimulatorEnv(gym.Env):
-    def __init__(self, env_idx: int = 0, step_size_seconds: float = 1.0):
+    def __init__(self, env_idx: int = 0, step_size_seconds: float = 1.0,
+                 log_dir: str='./simulator_outputs'):
         current_file_path = Path(__file__)
         project_root_path = current_file_path.parent.parent
 
@@ -51,7 +52,8 @@ class VidurSimulatorEnv(gym.Env):
             --no-metrics_config_enable_chrome_trace 
             --power_predictor_config_type gdbt 
             --gdbt_power_predictor_config_model_input_file {Path(__file__).parent.parent}/artifacts/power_model/a40_llama8-3b/power_model.pkl 
-            --latency_frequency_predictor_model_path {Path(__file__).parent.parent}/artifacts/latency_model/a40_llama8-3b
+            --latency_frequency_predictor_model_path {Path(__file__).parent.parent}/artifacts/latency_model/a40_llama8-3b 
+            --metrics_config_output_dir_root {log_dir}
         """
         self.env_idx = env_idx
         self.step_size_seconds = step_size_seconds
