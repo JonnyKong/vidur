@@ -58,7 +58,10 @@ class VidurSimulatorEnv(gym.Env):
         self.env_idx = env_idx
         self.step_size_seconds = step_size_seconds
 
-        self.observation_space = gym.spaces.Box(0, 100, shape=(2,))
+        self.observation_space = gym.spaces.Box(0, 100, shape=(8,))
+
+        self.observation_history = np.zeros((4, 2), dtype=np.float32)
+
 
         self.freq_choices = A40_FREQ_CHOICES
         self.action_space = gym.spaces.Discrete(len(self.freq_choices))
@@ -113,7 +116,7 @@ class VidurSimulatorEnv(gym.Env):
 
         # Log chrome traces regularly
         self.config.metrics_config.enable_chrome_trace = (
-            self.env_idx == 0 and self.episode_id % 50 == 0)
+            self.env_idx == 0 and self.episode_id % 1 == 0)
 
         # Use highest freq in the beginning
         self.simulator = Simulator(self.config)
@@ -122,9 +125,15 @@ class VidurSimulatorEnv(gym.Env):
         self.last_step_time = 0.0
 
         observation = self._get_obs(replica_scheduler_states=[])
+        if len(self.observation_history) < 4:
+            self.observation_history.extend([np.zeros_like(observation)] * (4 - len(self.observation_history)))
+        elif len(self.observation_history) == 4:
+            self.observation_history = self.observation_history[1:]
+        self.observation_history = np.append(self.observation_history, [observation], axis=0)
+
         info = self._get_info()
 
-        return observation, info
+        return self.observation_history.flatten(), info
 
     def step(self, action):
         assert self.simulator
@@ -147,15 +156,22 @@ class VidurSimulatorEnv(gym.Env):
 
         # terminate if overloads too much, and give a negative reward
         observation = self._get_obs(replica_scheduler_states)
+        if len(self.observation_history) < 4:
+            self.observation_history.extend([np.zeros_like(observation)] * (4 - len(self.observation_history)))
+        elif len(self.observation_history) == 4:
+            self.observation_history = self.observation_history[1:]
+        self.observation_history = np.append(self.observation_history, [observation], axis=0)
+
         reward = self._calc_reward(replica_scheduler_states)
         # reward = 0.5
 
         if self.is_overloaded(replica_scheduler_states):
             print('Env terminated because waiting queue grows too long')
             terminated = True
-            reward = -1.0
+            reward = -10.0
 
-        return observation, reward, terminated, False, self._get_info()
+        return self.observation_history.flatten(), reward, terminated, False, self._get_info()
+
 
     @staticmethod
     def _calc_reward(replica_scheduler_states: List[dict]) -> float:
