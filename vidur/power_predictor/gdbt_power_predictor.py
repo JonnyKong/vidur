@@ -1,6 +1,5 @@
-import pickle
-
 import numpy as np
+from lightgbm import Booster
 
 from vidur.config import GdbtPowerPredictorConfig
 from vidur.entities import Batch
@@ -16,8 +15,7 @@ class GdbtPowerPredictor(BasePowerPredictor):
         super().__init__(power_predictor_config)
 
         logger.info(f'Loading GDBT predictor from: {power_predictor_config.model_input_file}')
-        with open(power_predictor_config.model_input_file, 'rb') as f:
-            self._model = pickle.load(f)
+        self._model = Booster(model_file=power_predictor_config.model_input_file)
 
     def predict(self, batch: Batch, freq: int) -> float:
         prefill_lens = batch.prefill_lens

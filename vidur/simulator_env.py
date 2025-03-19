@@ -51,14 +51,14 @@ class VidurSimulatorEnv(gym.Env):
             --no-metrics_config_keep_individual_batch_metrics 
             --no-metrics_config_enable_chrome_trace 
             --power_predictor_config_type gdbt 
-            --gdbt_power_predictor_config_model_input_file {Path(__file__).parent.parent}/artifacts/power_model/a40_llama8-3b/power_model.pkl 
+            --gdbt_power_predictor_config_model_input_file {Path(__file__).parent.parent}/artifacts/power_model/a40_llama8-3b/power_model.txt 
             --latency_frequency_predictor_model_path {Path(__file__).parent.parent}/artifacts/latency_model/a40_llama8-3b 
             --metrics_config_output_dir_root {log_dir} 
         """
         self.env_idx = env_idx
         self.step_size_seconds = step_size_seconds
 
-        self.observation_space = gym.spaces.Box(0, 100, shape=(3,))
+        self.observation_space = gym.spaces.Box(0, 100, shape=(2,))
 
         self.freq_choices = A40_FREQ_CHOICES
         self.action_space = gym.spaces.Discrete(len(self.freq_choices))
@@ -74,7 +74,7 @@ class VidurSimulatorEnv(gym.Env):
     @staticmethod
     def _get_obs(replica_scheduler_states: List[dict]):
         if len(replica_scheduler_states) == 0:
-            return np.array([0.0, 0.0, 0.0], dtype=np.float32)
+            return np.array([0.0, 0.0], dtype=np.float32)
 
         busy_energy = np.sum([s['last_batch_busy_power'] * s['last_batch_busy_duration']
                               for s in replica_scheduler_states])
@@ -85,11 +85,14 @@ class VidurSimulatorEnv(gym.Env):
         avg_power = (busy_energy + idle_energy) / total_duration
         avg_power_util = avg_power / A40_TDP * 100
 
-        latest_state = replica_scheduler_states[-1]
+        avg_waiting_queue_len = np.mean([s['waiting_queue_len']
+                                        for s in replica_scheduler_states])
+        avg_memory_usage_percent = np.mean([s['memory_usage_percent']
+                                        for s in replica_scheduler_states])
+
         return np.array([
-            latest_state['memory_usage_percent'],
-            latest_state['waiting_queue_len'],
-            avg_power_util,
+            avg_memory_usage_percent,
+            avg_waiting_queue_len,
         ], dtype=np.float32)
 
     def _get_info(self):
@@ -171,7 +174,7 @@ class VidurSimulatorEnv(gym.Env):
             tbt = np.sum([s['last_batch_busy_duration'] + s['last_batch_idle_duration']
                           for s in replica_scheduler_states])
 
-            reward = (1 - (avg_power / A40_TDP)) - (0.05 * mean_waiting_queue_size)
+            reward = (1 - (avg_power / A40_TDP)) - (0.01 * mean_waiting_queue_size)
             return reward
         else:
             return 0.0

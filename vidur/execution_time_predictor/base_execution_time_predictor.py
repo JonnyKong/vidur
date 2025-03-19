@@ -3,6 +3,7 @@ from abc import ABC
 from abc import abstractmethod
 from pathlib import Path
 from typing import Optional
+from lightgbm import Booster
 
 import numpy as np
 
@@ -99,7 +100,7 @@ class BaseExecutionTimePredictor(ABC):
                 ]).reshape(1, -1)
                 latency_from_freq_model = self._latency_freq_model_hybrid.predict(
                     model_input_hybrid)
-            latency_from_freq_model = latency_from_freq_model.item()
+            latency_from_freq_model = np.exp(latency_from_freq_model.item())
             assert latency_from_freq_model > 0
             t = ExecutionTime(
                 self._num_layers_per_pipeline_stage,
@@ -235,15 +236,15 @@ class BaseExecutionTimePredictor(ABC):
             return
         try:
             print('Loading latency frequency model ...')
-            with open(Path(path) / 'latency_model_prefill-only.pkl', 'rb') as f:
-                self._latency_freq_model_prefill = pickle.load(f)
-                logger.info("Loaded prefill model")
-            with open(Path(path) / 'latency_model_decode-only.pkl', 'rb') as f:
-                self._latency_freq_model_decode = pickle.load(f)
-                logger.info("Loaded decode model")
-            with open(Path(path) / 'latency_model_hybrid.pkl', 'rb') as f:
-                self._latency_freq_model_hybrid = pickle.load(f)
-                logger.info("Loaded hybrid model")
+            self._latency_freq_model_prefill = Booster(
+                    model_file=Path(path) / 'latency_model_prefill-only.txt')
+            logger.info("Loaded prefill model")
+            self._latency_freq_model_decode = Booster(
+                    model_file=Path(path) / 'latency_model_decode-only.txt')
+            logger.info("Loaded decode-only model")
+            self._latency_freq_model_hybrid = Booster(
+                    model_file=Path(path) / 'latency_model_hybrid.txt')
+            logger.info("Loaded hybrid model")
             self.latency_frequency_predictor_enabled = True
         except FileNotFoundError:
             raise FileNotFoundError(

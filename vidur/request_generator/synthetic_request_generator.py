@@ -11,7 +11,6 @@ from vidur.request_generator.request_length_generator_registry import (
 )
 from vidur.types import RequestIntervalGeneratorType
 from vidur.utils.random import set_seeds
-from vidur.utils.timing_utils import timeit
 
 
 class SyntheticRequestGenerator(BaseRequestGenerator):
@@ -62,11 +61,10 @@ class SyntheticRequestGenerator(BaseRequestGenerator):
                 current_time = request.arrived_at
                 requests.append(request)
         elif self.config.num_requests is not None:
-            with timeit('_generate_requests()'):
-                for _ in range(self.config.num_requests):
-                    request = self._generate_next_request(current_time)
-                    current_time = request.arrived_at
-                    requests.append(request)
+            for _ in range(self.config.num_requests):
+                request = self._generate_next_request(current_time)
+                current_time = request.arrived_at
+                requests.append(request)
         else:
             assert (
                 self.config.interval_generator_config.get_type()
