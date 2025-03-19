@@ -15,6 +15,12 @@ class GammaRequestIntervalGenerator(BaseRequestIntervalGenerator):
         self.qps = self.config.qps
         self.gamma_shape = 1.0 / (cv**2)
 
-    def get_next_inter_request_time(self) -> float:
+        # Generate a large set of arrival times in batch on initialization
         gamma_scale = 1.0 / (self.qps * self.gamma_shape)
-        return gamma.rvs(self.gamma_shape, scale=gamma_scale)
+        self.precomputed_arrival_times = gamma.rvs(
+                self.gamma_shape, scale=gamma_scale, size=65536)
+        self.index = 0
+
+    def get_next_inter_request_time(self) -> float:
+        self.index = (self.index + 1) % len(self.precomputed_arrival_times)
+        return self.precomputed_arrival_times[self.index]
