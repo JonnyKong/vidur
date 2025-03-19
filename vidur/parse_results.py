@@ -11,6 +11,7 @@ import pandas as pd
 
 @dataclass
 class PerfStats:
+    # Keep the same as in: https://github.com/JonnyKong/EnergyEfficientServing/blob/main/scripts/analysis.py
     throughput: float   # Requests per second
     ttft_mean: float
     ttft_p99: float
@@ -29,6 +30,8 @@ class PerfStats:
     running_queue_len_mean: float
     waiting_queue_len_mean: float
     expr_duration_s: float
+    num_requests: int
+    num_tokens_decoded: int
 
 
 def extract_steady_region(
@@ -94,7 +97,7 @@ def load_trace_into_df(trace_path: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     assert (
         len(df_stats) == len(df_batches)    # Simulator terminated gracefully
-        or len(df_stats) == len(df_batches) + 1 # Terminated early
+        or len(df_stats) == len(df_batches) + 1  # Terminated early
     )
     assert df_stats.ts.is_monotonic_increasing
     assert df_batches.ts.is_monotonic_increasing
@@ -136,6 +139,8 @@ def calc_perf_stats(df_stats: pd.DataFrame, df_requests: pd.DataFrame) -> PerfSt
         running_queue_len_mean=df_stats.running_queue_len.mean(),
         waiting_queue_len_mean=df_stats.waiting_queue_len.mean(),
         expr_duration_s=(df_stats.ts.max() - df_stats.ts.min()) / 1e6,
+        num_requests=len(df_requests),
+        num_tokens_decoded=df_requests.num_decode_tokens.sum(),
     )
 
 
