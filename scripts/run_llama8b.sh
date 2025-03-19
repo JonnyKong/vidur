@@ -2,7 +2,7 @@
 
 set -e
 
-python -m vidur.main \
+OMP_NUM_THREADS=1 python -m vidur.main \
     --replica_config_device a40 \
     --replica_config_model_name meta-llama/Meta-Llama-3-8B \
     --cluster_config_num_replicas 1 \
@@ -24,5 +24,5 @@ python -m vidur.main \
     --random_forrest_execution_time_predictor_config_prediction_max_batch_size 2048 \
     --random_forrest_execution_time_predictor_config_prediction_max_tokens_per_request 16384 \
     --power_predictor_config_type gdbt \
-    --gdbt_power_predictor_config_model_input_file artifacts/power_model/a40_llama8-3b/power_model.pkl \
+    --gdbt_power_predictor_config_model_input_file artifacts/power_model/a40_llama8-3b/power_model.txt \
     --latency_frequency_predictor_model_path artifacts/latency_model/a40_llama8-3b
