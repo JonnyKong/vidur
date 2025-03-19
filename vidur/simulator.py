@@ -53,6 +53,7 @@ class Simulator:
                 config.latency_frequency_predictor_model_path)
 
         self._init_event_queue()
+        self.replenish_counter = 0
 
     @property
     def scheduler(self) -> BaseGlobalScheduler:
@@ -81,7 +82,9 @@ class Simulator:
     
         if self._config.auto_replenish_requests and len(self._event_queue) == 1:
             self._replenish_event_queue(event._time + 0.1)
-            self._write_output()
+            self.replenish_counter += 1
+            if self.replenish_counter % 20 == 0:
+                self._write_output()
             print(f"Replenishing the event queue with {len(self._event_queue)} requests")
 
         if self._config.metrics_config.write_json_trace:
